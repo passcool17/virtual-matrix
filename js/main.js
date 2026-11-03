@@ -47,14 +47,14 @@ const mute = () => { G.muted = !G.muted; setMuted(G.muted); setMusicMuted(G.mute
 // ---------- verrous ----------
 function lockCtx(id) {
   return { t: () => G.t, rnd: () => G.rnd(), sfx, hasClue: c => G.clues.has(c), frags: () => G.order.filter(i => i !== 'source').map(i => ({ n: nodeById[i].n, title: nodeById[i].title, code: G.frags[i] })).sort((a, b) => a.n - b.n),
-    deny: msg => { if (lock && G.lockId === id) { $('lkMsg').className = 'lk-msg'; $('lkMsg').textContent = msg; } deny(msg); }, grant: () => grant(id),
+    deny: msg => { if (!lock || G.lockId !== id) return; $('lkMsg').className = 'lk-msg'; $('lkMsg').textContent = msg; deny(msg); }, grant: () => { if (G.lockId === id) grant(id); },
     flash: msg => { $('lkMsg').className = 'lk-msg'; $('lkMsg').textContent = msg; } };
 }
 function openLock(id) {
   if (G.phase !== 'playing' || G.opened.has(id) || lock) return false;
   if (id === 'source') { if (G.opened.size < 5) { deny(`${5 - G.opened.size} verrou${G.opened.size < 4 ? 's' : ''} requis`, false); return false; } locks.source = LOCKS.source(lockCtx('source')); }
   lock = locks[id]; G.lockId = id; const n = nodeById[id];
-  $('lkTitle').textContent = `VERROU ${String(n.n).padStart(2, '0')} · ${n.title}`; $('lkHelp').textContent = lock.help; $('lkMsg').textContent = ''; $('lkBody').replaceChildren(); lock.mount($('lkBody'));
+  $('lkTitle').textContent = `VERROU ${String(n.n).padStart(2, '0')} · ${n.title}`; $('lkHelp').textContent = lock.help; $('lkMsg').textContent = ''; const body = document.createElement('div'); body.className = 'lk-body'; $('lkBody').replaceChildren(body); lock.mount(body); // conteneur neuf : les écouteurs d'un verrou précédent ne survivent pas
   $('lkClue').textContent = lock.clueText && G.clues.has(id) ? `◇ Indice capté : ${lock.clueText()}` : '';
   releaseLock(); $('lock').classList.add('on'); G.vel.set(0, 0, 0); sfx.tick();
   onKey(e => { if (e.code === 'Escape') { closeLock(); return true; } if (e.code === 'KeyM') return false; lock?.key(e); return true; });
@@ -70,6 +70,7 @@ function deny(msg, raise = true) {
 }
 const clearDenied = () => { denyLines.forEach(d => d.el.remove()); denyLines = []; };
 function grant(id) {
+  if (G.opened.has(id) || G.phase !== 'playing') return; // un verrou ne s'ouvre qu'une fois (double tap, événement en retard)
   const n = nodeById[id]; closeLock(); G.opened.add(id); G.order.push(id); world.setNode(id, true);
   G.frags[id] = id === 'source' ? '∞' : fragCode();
   G.alert = Math.max(0, G.alert - ALERT.perGrant); clearDenied(); G.trauma = 0.65; sfx.granted(); sfx.decode();

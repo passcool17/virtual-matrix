@@ -36,7 +36,7 @@ async function run(kind) {
   const deniedCount = () => ev(() => __vm.G.denied);
   const openNear = async id => { await ev(id => __vm.tp(id), id); await waitT(0.25); if (mobile) await p.tap('#tHack'); else await p.keyboard.press('KeyE'); await p.waitForFunction(id => __vm.G.lockId === id, id, { timeout: 20000 }); };
   const solvedBy = async (id, how) => { await p.waitForFunction(id => __vm.G.opened.has(id), id, { timeout: 30000 }).catch(() => {}); const st = await ev(() => JSON.stringify({ phase: __vm.G.phase, lock: __vm.G.lockId, alert: +__vm.G.alert.toFixed(2), lvl: __vm.G.alertLvl, sent: __vm.G.sentinel.on, opened: [...__vm.G.opened], msg: document.getElementById('lkMsg').textContent })); const o = (await opened()).includes(id); ok(`${px} ${id} résolu (${how})`, o, o ? '' : st); };
-  const pressPulse = async () => { await p.waitForFunction(() => { const t = __vm.G.t, P = __vm.G.pulse, k = Math.round(t / P); return Math.abs(t - k * P) < 0.07 && k !== window.__lastK && (window.__lastK = k, true); }, null, { timeout: 20000, polling: 'raf' });
+  const pressPulse = async () => { await p.waitForFunction(() => { const t = __vm.G.t, P = __vm.G.pulse, k = Math.round(t / P); const d = t - k * P; return d > -0.1 && d < -0.03 && k !== window.__lastK && (window.__lastK = k, true); } /* juste avant le temps fort : la latence du tap retombe dans la fenêtre ±0,14 s */, null, { timeout: 20000, polling: 'raf' });
     if (mobile) await p.tap('#lkBody [data-act="hit"]'); else await p.keyboard.press('Space'); };
 
   // --- Menu
@@ -115,7 +115,7 @@ async function run(kind) {
   const wrongOrder = so.order.slice().reverse();
   for (const c of wrongOrder) { if (mobile) await act(c); else await p.keyboard.press('Digit' + (so.choices.indexOf(c) + 1)); }
   ok(`${px} SOURCE ordre faux → DENIED`, (await ev(() => __vm.G.lockId)) === 'source' && (await deniedCount()) === 5);
-  for (const c of so.order) { if (mobile) await act(c); else await p.keyboard.press('Digit' + (so.choices.indexOf(c) + 1)); }
+  for (const c of so.order) { if (mobile) await act(c); else await p.keyboard.press('Digit' + (so.choices.indexOf(c) + 1)); if (process.env.VM_DEBUG) console.log('   ', c, await ev(() => [...document.querySelectorAll('.lk-slot')].map(s => s.textContent).join(' ') + ' | ' + JSON.stringify(__vm.secret('source')))); }
   await solvedBy('source', mobile ? 'taps' : 'clavier');
   await p.waitForFunction(() => __vm.G.phase === 'complete', null, { timeout: 60000 }).catch(() => {});
   ok(`${px} partie complète → écran de fin`, await ev(() => __vm.G.phase === 'complete'));
@@ -132,9 +132,9 @@ async function run(kind) {
   await tapOrClick('#bAgain'); await waitT(0.3); await ev(() => __vm.solve('spoon')); await ev(() => __vm.solve('rabbit')); await waitT(2);
   await ev(() => { __vm.tp('desert'); __vm.setAlert(7); }); await waitT(0.3);
   ok(`${px} niveau 3 → sentinelle`, await ev(() => __vm.G.alertLvl === 3 && __vm.G.sentinel.on));
+  const before = await ev(() => ({ n: __vm.G.opened.size }));
   await ev(() => { const G = __vm.G; G.sentinel.pos.set(G.pos.x + 1.5, G.pos.y + 0.6, G.pos.z - 9); }); await waitT(0.15);
   await shot('alert3-sentinel');
-  const before = await ev(() => ({ n: __vm.G.opened.size, pos: __vm.G.pos.clone() }));
   await waitT(1.6);
   const after = await ev(() => ({ n: __vm.G.opened.size, on: __vm.G.sentinel.on, alert: __vm.G.alert, rabbit: __vm.G.opened.has('rabbit') }));
   ok(`${px} contact sentinelle : dernier fragment volé, alerte → ~4`, before.n === 2 && after.n === 1 && !after.rabbit && !after.on && after.alert <= 4.01, JSON.stringify(after));

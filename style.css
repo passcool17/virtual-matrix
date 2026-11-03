@@ -97,7 +97,7 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 .term header { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .term header b { color: var(--primary); font-size: 14px; }
 .lk-help { color: var(--muted); font-size: 12px; margin: 8px 0 10px; }
-.lk-body { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#lkBody { display: block; } .lk-body { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .lk-msg { min-height: 1.4em; margin: 10px 0 0; text-align: center; color: #ff8a80; font-size: 13px; }
 .lk-msg.ok { color: var(--primary); }
 .lk-clue { margin: 4px 0 0; text-align: center; color: #c8ffd4; font-size: 12px; min-height: 1em; }
