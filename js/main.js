@@ -174,7 +174,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
   if (G.phase === 'playing') { step(dt); hud(); }
-  if (G.phase !== 'paused') setMood(G.phase === 'playing' && (G.alertLvl >= 2 || G.lockId === 'source') ? 'escape' : 'theme');
+  if (G.phase !== 'paused') setMood(G.phase !== 'playing' ? 'menu' : G.lockId === 'source' ? 'source' : G.alertLvl >= 2 ? 'alert' : 'calm');
   if (G.phase === 'playing' || G.phase === 'paused') { $('flash').style.opacity = (G.trauma * G.trauma * 0.42).toFixed(3); world.render(G, G.phase === 'playing' ? dt : 0); }
   requestAnimationFrame(frame);
 }

@@ -19,12 +19,12 @@ Miroir possible : https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages via
 
 | Verrou | Énigme |
 |---|---|
-| 01 CUILLÈRE | Code de 4 chiffres distincts (1–6). Après chaque essai, tu vois combien de chiffres sont bien placés et combien sont mal placés. |
-| 02 LAPIN | Répète une séquence de symboles clignotants, en 3 rondes (3, 4 puis 5 symboles). |
-| 03 DÉSERT | Aligne le glyphe cible sur 3 anneaux. Attention, tourner un anneau fait aussi tourner celui du dessous. |
-| 04 CHOIX | Frappe en rythme avec le battement du nœud, 3 fois de suite. |
-| 05 SOMMEIL | Mot de passe chiffré par décalage (César). Règle le décalage jusqu'à lire un vrai mot. |
-| 06 SOURCE | Rentre les 5 fragments dans l'ordre, sans te laisser piéger par les 2 leurres. |
+| 01 CUILLÈRE | Code de 4 chiffres distincts (1–6). Après chaque essai, les chiffres bien placés s'allument en vert à leur position ; les mal placés sont seulement comptés. |
+| 02 LAPIN | Répète une séquence de symboles clignotants, en 3 rondes (3, 4 puis 5 symboles), un symbole toutes les 0,6 s. |
+| 03 DÉSERT | Aligne le glyphe cible sur 3 anneaux ; chaque anneau ne montre que 3 glyphes à la fois. Attention, tourner un anneau fait aussi tourner celui du dessous. |
+| 04 CHOIX | Frappe en rythme avec le battement du nœud (fenêtre ±0,12 s), 3 fois de suite. |
+| 05 SOMMEIL | Mot de passe chiffré par décalage (César). Règle le décalage (1 à 9) ; l'aperçu ne déchiffre que la première moitié du mot. |
+| 06 SOURCE | Rentre les 5 fragments dans l'ordre, sans te laisser piéger par les 2 leurres. Les codes se lisent dans ta liste de fragments (HUD). |
 
 **Indices :** des glyphes flottent dans le monde. L'un donne un chiffre de la CUILLÈRE, l'autre le décalage du SOMMEIL. Ils facilitent les énigmes, mais tu peux t'en passer.
 
@@ -36,7 +36,7 @@ Miroir possible : https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages via
 - Toutes les énigmes se jouent au clavier, à la souris et au toucher.
 
 ## Musique
-Quatre pistes d'ambiance composées par Pascal (`music/`, MP3 128 kb/s) : **theme-1** et **theme-2** jouent au menu et en vol calme, **escape-1** et **escape-2** prennent le relais dès que le pare-feu atteint le niveau 2 et pendant le verrou SOURCE. Le passage se fait en fondu enchaîné de 2,5 s, et chaque liste tourne en boucle. La musique démarre au premier clic ou à la première touche (règle d'autolecture des navigateurs) et elle est lue en streaming. Les effets synthétisés jouent par-dessus, et M ou le bouton ♪ coupent tout.
+Quatre pistes d'ambiance composées par Pascal (`music/`, MP3 128 kb/s) : une piste par étape, dans l'ordre choisi par Pascal : **escape-1** (1:53) au menu, **theme-1** (2:05) en vol calme, **escape-2** (2:13) dès que le pare-feu atteint le niveau 2, **theme-2** (2:16) pendant le verrou final SOURCE. Le passage se fait en fondu enchaîné de 2,5 s, chaque piste boucle, et le retour au calme attend 4 s sans alerte. La musique démarre au premier clic ou à la première touche (règle d'autolecture des navigateurs) et elle est lue en streaming. Les effets synthétisés jouent par-dessus, et M ou le bouton ♪ coupent tout.
 
 ## Voix de la machine
 Chaque verrou a sa consigne vocale (`voice/machine_puzzle_0X_*.mp3`, mono 64 kb/s, 5,6 à 8,9 s, 339 Ko au total). Elle joue une fois à l'ouverture du verrou, la musique baisse à 35 % pendant qu'elle parle puis remonte, et quitter le verrou la coupe. La rouvrir rejoue la consigne ; le bouton **◉ voix** de l'en-tête (qui pulse pendant la lecture) la rejoue aussi. M et le bouton ♪ coupent aussi la voix. Un seul élément `<audio>` est réutilisé et débloqué au premier geste, ce qui permet la lecture sur iOS (le déblocage joue 10 ms de silence intégré, aucun téléchargement). Si un fichier manque, le verrou fonctionne normalement, en silence.
@@ -45,7 +45,7 @@ Chaque verrou a sa consigne vocale (`voice/machine_puzzle_0X_*.mp3`, mono 64 kb/
 ```sh
 node tools/serve.js      # http://localhost:8642/   (?qa=1 = démarrage direct, ?seed=n = énigmes reproductibles)
 node tools/test.cjs      # vérification Playwright, ordi + mobile
-node tools/test-music.cjs  # musique : 1er geste, bascule d'alerte, rotation, sourdine
+node tools/test-music.cjs  # musique : 1er geste, piste de chaque étape (ordre 1→4), fondu, boucle, sourdine
 node tools/test-voice.cjs  # voix : bon fichier par verrou, musique baissée, fermeture, sourdine, fichier manquant
 ```
 `index.html` est à la racine du dépôt et tous les chemins sont relatifs : le dépôt est publiable tel quel (GitHub Pages, branche `main`, dossier `/` ; `.nojekyll` désactive Jekyll). Le jeu n'a ni étape de build ni dépendance : three.js r170 est inclus dans `vendor/`, et les polices Orbitron et Share Tech Mono (licence OFL) dans `fonts/`.

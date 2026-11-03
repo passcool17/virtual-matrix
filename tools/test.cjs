@@ -36,7 +36,7 @@ async function run(kind) {
   const deniedCount = () => ev(() => __vm.G.denied);
   const openNear = async id => { await ev(id => __vm.tp(id), id); await waitT(0.25); if (mobile) await p.tap('#tHack'); else await p.keyboard.press('KeyE'); await p.waitForFunction(id => __vm.G.lockId === id, id, { timeout: 20000 }); };
   const solvedBy = async (id, how) => { await p.waitForFunction(id => __vm.G.opened.has(id), id, { timeout: 30000 }).catch(() => {}); const st = await ev(() => JSON.stringify({ phase: __vm.G.phase, lock: __vm.G.lockId, alert: +__vm.G.alert.toFixed(2), lvl: __vm.G.alertLvl, sent: __vm.G.sentinel.on, opened: [...__vm.G.opened], msg: document.getElementById('lkMsg').textContent })); const o = (await opened()).includes(id); ok(`${px} ${id} résolu (${how})`, o, o ? '' : st); };
-  const pressPulse = async () => { await p.waitForFunction(() => { const t = __vm.G.t, P = __vm.G.pulse, k = Math.round(t / P); const d = t - k * P; return d > -0.1 && d < -0.03 && k !== window.__lastK && (window.__lastK = k, true); } /* juste avant le temps fort : la latence du tap retombe dans la fenêtre ±0,14 s */, null, { timeout: 20000, polling: 'raf' });
+  const pressPulse = async () => { await p.waitForFunction(() => { const t = __vm.G.t, P = __vm.G.pulse, k = Math.round(t / P); const d = t - k * P; return d > -0.1 && d < -0.03 && k !== window.__lastK && (window.__lastK = k, true); } /* juste avant le temps fort : la latence du tap retombe dans la fenêtre ±0,12 s */, null, { timeout: 20000, polling: 'raf' });
     if (mobile) await p.tap('#lkBody [data-act="hit"]'); else await p.keyboard.press('Space'); };
 
   // --- Menu
@@ -67,6 +67,8 @@ async function run(kind) {
   for (const w of wrongs) { for (const d of w) { if (mobile) await act(d); else await p.keyboard.press('Digit' + d); } if (mobile) await act('ok'); else await p.keyboard.press('Enter'); }
   await waitT(0.2); const dn = await deniedCount(); ok(`${px} DENIED empilés`, dn === 4 && (await ev(() => document.querySelectorAll('#denied .deny').length)) === 4, `denied=${dn}`);
   ok(`${px} retour Mastermind affiché`, /bien placé/.test(await ev(() => document.querySelector('.lk-log').textContent)));
+  { const r = await ev(s => [...document.querySelectorAll('.lk-log li')].map(li => [...li.querySelectorAll('.lk-d')].map((d, i) => d.classList.contains('hit') === (d.textContent === s[i]))), sec);
+    ok(`${px} CUILLÈRE : chiffres bien placés allumés à leur position`, r.length === 4 && r.every(x => x.length === 4 && x.every(Boolean)), JSON.stringify(r)); }
   await shot('denied-stack');
   await ev(() => document.querySelectorAll('#denied .deny').forEach(e => e.style.display = 'none'));
   await shot('lock-spoon'); const lb = await ev(OVERLAP, LOCK_SEL); ok(`${px} overlay CUILLÈRE sans chevauchement`, lb.length === 0, lb.join(' | '));
@@ -104,7 +106,7 @@ async function run(kind) {
   await openNear('sleep'); const ss = await ev(() => __vm.secret('sleep'));
   for (let k = 0; k < ss.k; k++) { if (mobile) await act('up'); else await p.keyboard.press('ArrowRight'); }
   await shot('lock-sleep'); { const b = await ev(OVERLAP, LOCK_SEL); ok(`${px} overlay SOMMEIL sans chevauchement`, b.length === 0, b.join(' | ')); }
-  ok(`${px} SOMMEIL aperçu = mot clair`, (await ev(() => document.querySelector('.lk-preview').textContent)) === ss.word, ss.word);
+  ok(`${px} SOMMEIL aperçu = moitié du mot clair`, (await ev(() => document.querySelector('.lk-preview').textContent)) === ss.word.slice(0, Math.ceil(ss.word.length / 2)) + '·'.repeat(ss.word.length >> 1), ss.word);
   if (mobile) await act('ok'); else await p.keyboard.press('Enter');
   await solvedBy('sleep', mobile ? 'taps' : 'clavier'); await waitT(0.5);
 
@@ -129,7 +131,7 @@ async function run(kind) {
   ok(`${px} partie via accroches → fin`, await ev(() => __vm.G.phase === 'complete'));
 
   // --- Pare-feu niveau 3 + sentinelle
-  await tapOrClick('#bAgain'); await waitT(0.3); await ev(() => __vm.solve('spoon')); await ev(() => __vm.solve('rabbit')); await waitT(2);
+  await tapOrClick('#bAgain'); await waitT(0.3); await ev(() => __vm.solve('spoon')); await waitT(0.3); /* deux solve() collés font courir le verrou de pointeur headless */ await ev(() => __vm.solve('rabbit')); await waitT(2);
   await ev(() => { __vm.tp('desert'); __vm.setAlert(7); }); await waitT(0.3);
   ok(`${px} niveau 3 → sentinelle`, await ev(() => __vm.G.alertLvl === 3 && __vm.G.sentinel.on));
   const before = await ev(() => ({ n: __vm.G.opened.size }));
