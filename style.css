@@ -58,7 +58,7 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 .lbl { font-size: 10px; letter-spacing: .2em; }
 .hud-btn { pointer-events: auto; min-width: 44px; height: 44px; padding: 0 12px; border: 1px solid var(--border); background: rgba(4,8,6,.7); color: var(--fg); font-family: Orbitron; font-size: 11px; letter-spacing: .1em; }
 .hud-left { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
-.alert { flex-direction: row; align-items: center; gap: 6px; }
+.alert { flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
 .alert i { width: 16px; height: 8px; border: 1px solid var(--dim); display: inline-block; }
 .alert[data-l="1"] i:nth-of-type(-n+1), .alert[data-l="2"] i:nth-of-type(-n+2), .alert[data-l="3"] i:nth-of-type(-n+3) { background: var(--red); border-color: var(--red); box-shadow: 0 0 8px var(--red); }
 .alert[data-l="3"] { color: var(--red); animation: blink .6s steps(2) infinite; } .alert[data-l="3"] .lbl, .alert[data-l="3"] span { color: var(--red); }
@@ -146,6 +146,7 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 @media (max-width: 560px) {
   .hud-box { padding: 5px 8px; font-size: 11px; } .hud-top .hud-box:first-child span { font-size: 10px; }
   .hud-btn { padding: 0 9px; }
+  .alert { gap: 5px; } .alert .lbl { letter-spacing: .08em; } .alert i { width: 12px; }
   .lk-pad { grid-template-columns: repeat(4, 56px); } .lk-pad.src { grid-template-columns: repeat(4, 62px); }
   .term { padding: 12px; } .lk-pulse { width: 130px; height: 130px; }
   .lk-win .g { width: 30px; }
