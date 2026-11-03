@@ -2,7 +2,9 @@
 
 Tu voles librement dans une grille de code. Six nœuds y sont **verrouillés**. Chaque erreur affiche un énorme **ACCESS DENIED** rouge qui s'empile à l'écran. Chaque réussite déclenche un **ACCESS GRANTED** vert et te donne un fragment de code. Ouvre les cinq verrous, puis rentre leurs fragments dans la **SOURCE**.
 
-▶ **Jouer :** https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages, une fois publié)
+▶ **Jouer :** https://passcool17.github.io/virtual-matrix/ (GitHub Pages, servi depuis la racine de `main`)
+
+Miroir possible : https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages via `.gitlab-ci.yml`)
 
 ## Comment jouer
 1. Choisis la **pilule rouge**.
@@ -38,4 +40,4 @@ Tu voles librement dans une grille de code. Six nœuds y sont **verrouillés**. 
 node tools/serve.js      # http://localhost:8642/   (?qa=1 = démarrage direct, ?seed=n = énigmes reproductibles)
 node tools/test.cjs      # vérification Playwright, ordi + mobile
 ```
-Le jeu n'a ni étape de build ni dépendance : three.js r170 est inclus dans `vendor/`, et les polices Orbitron et Share Tech Mono (licence OFL) dans `fonts/`.
+`index.html` est à la racine du dépôt et tous les chemins sont relatifs : le dépôt est publiable tel quel (GitHub Pages, branche `main`, dossier `/` ; `.nojekyll` désactive Jekyll). Le jeu n'a ni étape de build ni dépendance : three.js r170 est inclus dans `vendor/`, et les polices Orbitron et Share Tech Mono (licence OFL) dans `fonts/`.
