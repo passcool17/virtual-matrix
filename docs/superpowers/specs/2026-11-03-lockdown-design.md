@@ -26,7 +26,7 @@ E within 3.6 m of an unopened node → lock overlay (terminal). While the overla
 
 | Node | Puzzle | Keyboard | Clue (in the world) |
 |---|---|---|---|
-| CUILLÈRE | 4-digit code (distinct digits), feedback per try: "n bien placés · m mal placés" | 0–9, Backspace, Enter | glyph near LAPIN: "CUILLÈRE · chiffre k = d" |
+| CUILLÈRE | 4-digit code (distinct digits 1–6), feedback per try: "n bien placés · m mal placés" | 1–6, Backspace, Enter | glyph near LAPIN: "CUILLÈRE · chiffre k = d" |
 | LAPIN | Simon of 4 symbols, sequence 3 → 4 → 5 (3 rounds); a mistake replays the round | 1–4 | none |
 | DÉSERT | 3 rings of 8 glyphs, align the target glyph at the top. Turning a ring also drives the next ring (coupled), then VALIDER | ↑/↓ choose ring, ←/→ turn, Enter | none |
 | CHOIX | the node pulses (period 1.1 s), hit the window (±0.14 s around the peak) 3 times; a miss resets the counter | Space/E/Enter | none |
@@ -51,7 +51,7 @@ HUD: "PARE-FEU" + 3 segments.
 Run time (game time while playing) + DENIED count. Ranking: `t + 5·denied`. localStorage `vm-lockdown-best` = `{t, denied}`. Menu MEILLEUR = "m:ss · n✕" or "—". End screen: time, DENIED, best, "NOUVEAU RECORD".
 
 ## Files
-index.html, style.css, js/{config,audio,rain2d,input,world,locks,ui,main}.js, tools/{serve.js,test.cjs}, README.md, GAME.md, .gitlab-ci.yml.
+index.html, style.css, js/{config,audio,rain2d,input,world,locks,main}.js (HUD/screens live in main.js), tools/{serve.js,test.cjs}, README.md, GAME.md, .gitlab-ci.yml.
 
 ## Verification
 Playwright headless SwiftShader, one browser at a time: 0 JS errors; desktop 1280×720 + mobile 390×844 captures (menu, flight, 6 overlays, DENIED stack, GRANTED, alert 3 + sentinel, end); each lock solved through a hook AND through simulated input (keys/clicks/taps); full run to the end; DOM overlap measurement (HUD and mobile overlays); FPS.
