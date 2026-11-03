@@ -15,7 +15,7 @@ function textSprite(lines) {
 
 export function createWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: devicePixelRatio < 2, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75)); renderer.setClearColor(COL.bg);
+  const baseDpr = Math.min(devicePixelRatio || 1, 1.75); let resScale = 1; renderer.setPixelRatio(baseDpr); renderer.setClearColor(COL.bg);
   const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(COL.bg, 0.03);
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 180); camera.rotation.order = 'YXZ';
 
@@ -97,7 +97,10 @@ export function createWorld(canvas) {
     for (const id in clues) { const c = clues[id]; if (c.sprite) { c.sprite.material.opacity = (G.clues.has(id) ? 0.55 : 0.75) + Math.sin(t * 3) * 0.2; c.sprite.position.y = c.pos.y + Math.sin(t * 1.3) * 0.25; } }
     sent.visible = G.sentinel.on; if (sent.visible) { sent.position.copy(G.sentinel.pos); sOuter.rotation.set(t * 1.7, t * 2.3, 0); spikes.rotation.set(-t, t * 0.7, t); sInner.scale.setScalar(1 + Math.sin(t * 12) * 0.15); }
     renderer.render(scene, camera);
-    frames++; const now = performance.now(); if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
+    frames++; const now = performance.now(); if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now;
+      // Résolution adaptative : sous 28 img/s, on réduit la définition (jusqu'à 45 %).
+      const next = fps < 28 ? Math.max(0.45, resScale * 0.8) : fps > 55 ? Math.min(1, resScale * 1.1) : resScale;
+      if (Math.abs(next - resScale) > 0.01) { resScale = next; renderer.setPixelRatio(baseDpr * resScale); resize(); } }
   }
-  return { render, resize, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; } };
+  return { render, resize, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; }, get resScale() { return resScale; } };
 }
