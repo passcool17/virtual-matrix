@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#040806">
+<meta name="description" content="Vole dans la grille, crochète six verrous, ouvre la Source. Chaque erreur : ACCESS DENIED.">
+<title>Virtual Matrix · Lockdown</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/orbitron.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/sharetechmono.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" data-phase="boot">
+  <canvas id="gl" aria-label="Construct 3D"></canvas>
+  <div class="vm-scanlines"></div><div class="vm-vignette"></div><div id="flash"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="layer">
+    <header class="hud-top">
+      <div class="vm-bracket hud-box"><b class="disp">VIRTUAL MATRIX</b><span id="hCoords">X 0 Y 0 Z 0</span></div>
+      <div class="hud-right">
+        <div class="vm-bracket hud-box"><span class="lbl">VERROUS</span><b id="hNodes" class="disp">0/6</b><span id="hTime">0:00</span></div>
+        <button id="bMute" class="hud-btn" type="button" aria-label="Couper le son">♪</button>
+        <button id="bPause" class="hud-btn" type="button">Pause</button>
+      </div>
+    </header>
+    <div id="hAlert" class="vm-bracket hud-box alert"><span class="lbl">PARE-FEU</span><i></i><i></i><i></i><span id="hAlertTxt">calme</span></div>
+    <div id="hFrags" class="hud-frags"></div>
+    <canvas id="radar" width="132" height="132" aria-label="Radar"></canvas>
+    <div class="vm-reticle"></div>
+    <div id="hPrompt" class="hud-prompt"></div>
+    <div id="hBanner" class="hud-banner"></div>
+    <div id="hKeys" class="hud-keys">WASD · SOURIS · E · ESC</div>
+    <div id="hCapture" class="hud-capture">Cliquer pour capturer le regard</div>
+  </div>
+
+  <!-- Commandes tactiles -->
+  <div id="touch" class="layer">
+    <div id="joy" class="joy"><div id="knob" class="knob"></div></div>
+    <div class="rise"><button id="tUp" type="button" aria-label="Monter">▲</button><button id="tDown" type="button" aria-label="Descendre">▼</button></div>
+    <button id="tHack" class="t-hack" type="button">DÉCODER</button>
+  </div>
+
+  <!-- Verrou -->
+  <div id="lock" class="layer" role="dialog" aria-modal="true" aria-labelledby="lkTitle">
+    <div class="term vm-bracket">
+      <header><b id="lkTitle" class="disp">VERROU</b><button id="lkClose" class="lk-btn alt" type="button" data-act="close">✕ Quitter</button></header>
+      <p id="lkHelp" class="lk-help"></p>
+      <div id="lkBody" class="lk-body"></div>
+      <p id="lkMsg" class="lk-msg"></p>
+      <p id="lkClue" class="lk-clue"></p>
+    </div>
+  </div>
+
+  <div id="denied" class="layer" aria-live="assertive"></div>
+  <div id="granted" class="layer" aria-live="assertive"><b class="disp">ACCESS GRANTED</b><span id="grTitle"></span></div>
+  <div id="toast" class="toast"></div>
+
+  <!-- Menu -->
+  <section id="sMenu" class="screen">
+    <canvas class="rain2d"></canvas><div class="vm-vignette"></div>
+    <div class="panel">
+      <p class="kicker vm-rise">CONSTRUCT / 02 · LOCKDOWN</p>
+      <h1 class="disp vm-rise">VIRTUAL MATRIX</h1>
+      <p class="sub disp vm-rise">· LOCKDOWN ·</p>
+      <p class="lead vm-rise">Six nœuds. Six verrous. Chaque erreur fait monter le pare-feu — et quelque chose finit par venir te chercher.</p>
+      <div class="pills vm-rise">
+        <button id="bRed" class="pill red" type="button"><b class="disp">Pilule rouge</b><span>Jack in</span></button>
+        <button id="bBlue" class="pill blue" type="button"><b class="disp">Pilule bleue</b><span>Rester</span></button>
+      </div>
+      <dl class="stats vm-rise"><div><dt>VERROUS</dt><dd>6</dd></div><div><dt>MEILLEUR</dt><dd id="mBest">—</dd></div><div><dt>VOL</dt><dd>6DoF</dd></div></dl>
+      <p class="howto vm-rise kb">ZQSD / WASD voler · Souris regarder · Espace monter · Ctrl descendre · E crocheter · Maj turbo · Échap pause</p>
+      <p class="howto vm-rise tc">Joystick voler · Glisser à droite regarder · ▲▼ monter/descendre · DÉCODER crocheter</p>
+    </div>
+  </section>
+
+  <section id="sBlue" class="screen">
+    <canvas class="rain2d"></canvas><div class="vm-vignette"></div>
+    <div class="panel">
+      <p class="kicker">MONDE RÉEL</p>
+      <h2 class="disp">Tu as choisi de t'endormir.</h2>
+      <p class="lead">Le monde que tu connais continue. Le construct reste ouvert, s'il te prend un doute.</p>
+      <div class="pills"><button id="bReconsider" class="pill red" type="button"><b class="disp">Reconsidérer</b><span>pilule rouge</span></button><button id="bIdle" class="pill blue" type="button"><b class="disp">Écran de veille</b><span>menu</span></button></div>
+    </div>
+  </section>
+
+  <section id="sPause" class="screen dim">
+    <div class="panel">
+      <p class="kicker">PAUSE</p><h2 class="disp">Construct gelé</h2>
+      <p class="lead" id="pInfo">Verrous ouverts 0/6</p>
+      <div class="col"><button id="bResume" class="pill red" type="button"><b class="disp">Reprendre</b></button><button id="bSound" class="pill blue" type="button"><b class="disp">Son activé</b></button><button id="bQuit" class="pill blue" type="button"><b class="disp">Déconnexion</b></button></div>
+    </div>
+  </section>
+
+  <section id="sEnd" class="screen">
+    <canvas class="rain2d"></canvas><div class="vm-vignette"></div>
+    <div class="panel">
+      <p class="kicker">SOURCE OUVERTE</p><h2 class="disp">TU ÉCRIS LE CODE</h2>
+      <p class="lead">Six verrous. Une grille. Le construct n'était jamais fermé — seulement illisible.</p>
+      <dl class="stats"><div><dt>TEMPS</dt><dd id="eTime">0:00</dd></div><div><dt>DENIED</dt><dd id="eDenied">0</dd></div><div><dt>MEILLEUR</dt><dd id="eBest">—</dd></div></dl>
+      <p id="eRecord" class="record disp">NOUVEAU RECORD</p>
+      <ul id="eFrags" class="end-frags"></ul>
+      <div class="pills"><button id="bAgain" class="pill red" type="button"><b class="disp">Rebrancher</b><span>nouvelle partie</span></button><button id="bMenu" class="pill blue" type="button"><b class="disp">Écran de veille</b><span>menu</span></button></div>
+    </div>
+  </section>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
