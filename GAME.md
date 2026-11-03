@@ -15,6 +15,7 @@ Voir README.md. Les touches sont lues par `event.code`. La version mobile utilis
 - Pare-feu à 3 niveaux et sentinelle voleuse de fragments.
 - Score = temps + DENIED, enregistré dans localStorage (`vm-lockdown-best`).
 - Musique de Pascal : thème ↔ escape (pare-feu ≥ 2 ou SOURCE), fondu de 2,5 s, rotation, démarrage au premier geste, streaming (`js/music.js`).
+- Voix de la machine : consigne vocale par verrou à l'ouverture, musique baissée à 35 %, coupée à la fermeture, bouton ◉ voix pour réécouter, coupée par la sourdine (`js/voice.js`, `voice/`).
 - Résolution adaptative : la définition baisse sous 28 img/s.
 - Accroches de test : `window.__vm` (`solve`, `open`, `tp`, `tpClue`, `setAlert`, `secret`, `waitT`). `?qa=1` lance la partie directement et `?seed=n` rend les énigmes reproductibles.
 

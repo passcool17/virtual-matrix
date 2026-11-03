@@ -106,6 +106,10 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 .lk-btn.alt { color: var(--muted); font-size: 15px; } .lk-btn.go { color: var(--bg); background: var(--primary); font-family: Orbitron; font-size: 13px; letter-spacing: .1em; }
 .lk-btn.wide { min-width: 200px; }
 .term header .lk-btn { min-height: 40px; font-size: 12px; }
+.term header b { flex: 1; } .lk-voice { min-width: 40px; padding: 0 10px; }
+.lk-voice.on { color: var(--primary); border-color: var(--primary); animation: vox 1s ease-in-out infinite; }
+@keyframes vox { 50% { box-shadow: 0 0 12px var(--primary); } }
+@media (prefers-reduced-motion: reduce) { .lk-voice.on { animation: none; } }
 .lk-slots { display: flex; gap: 8px; } .lk-slot { width: 46px; height: 52px; display: grid; place-items: center; border: 1px solid var(--border); color: var(--primary); font-size: 24px; background: #050c08; }
 .lk-pad { display: grid; grid-template-columns: repeat(4, 60px); gap: 8px; } .lk-pad.src { grid-template-columns: repeat(4, 66px); }
 .lk-pad small, .pad small { display: block; font-size: 9px; color: var(--dim); line-height: 1; }

@@ -2,7 +2,8 @@
 import { Vector3 } from '../vendor/three.module.min.js';
 import { CFG, NODES, CLUES, ALERT, alertLevel, BEST_KEY } from './config.js';
 import { initAudio, setMuted, sfx } from './audio.js';
-import { initMusic, setMood, setMusicMuted, musicState, musicSeekEnd } from './music.js';
+import { initMusic, setMood, setMusicMuted, musicState, musicSeekEnd, duckMusic } from './music.js';
+import { initVoice, playVoice, stopVoice, setVoiceMuted, voiceState } from './voice.js';
 import { startRain } from './rain2d.js';
 import { bindInput, bindTouch, readInput, onKey, isTouch, requestLock, releaseLock, pointerLocked } from './input.js';
 import { createWorld } from './world.js';
@@ -42,7 +43,7 @@ function newRun() {
 function jackIn() { initAudio(); sfx.jack(); newRun(); setPhase('playing'); G.trauma = 0.5; if (!touchMode) requestLock(canvas); }
 const resume = () => { initAudio(); setPhase('playing'); if (!touchMode && !lock) requestLock(canvas); };
 const pause = () => { if (G.phase !== 'playing') return; closeLock(true); setPhase('paused'); $('pInfo').textContent = `Verrous ouverts ${G.opened.size}/6 · ${fmt(G.runT)} · ${G.denied} DENIED`; };
-const mute = () => { G.muted = !G.muted; setMuted(G.muted); setMusicMuted(G.muted); $('bMute').textContent = G.muted ? '♪̸' : '♪'; $('bMute').setAttribute('aria-label', G.muted ? 'Activer le son' : 'Couper le son'); $('bSound').firstChild.textContent = G.muted ? 'Son coupé' : 'Son activé'; };
+const mute = () => { G.muted = !G.muted; setMuted(G.muted); setMusicMuted(G.muted); setVoiceMuted(G.muted); $('bMute').textContent = G.muted ? '♪̸' : '♪'; $('bMute').setAttribute('aria-label', G.muted ? 'Activer le son' : 'Couper le son'); $('bSound').firstChild.textContent = G.muted ? 'Son coupé' : 'Son activé'; };
 
 // ---------- verrous ----------
 function lockCtx(id) {
@@ -56,11 +57,11 @@ function openLock(id) {
   lock = locks[id]; G.lockId = id; const n = nodeById[id];
   $('lkTitle').textContent = `VERROU ${String(n.n).padStart(2, '0')} · ${n.title}`; $('lkHelp').textContent = lock.help; $('lkMsg').textContent = ''; const body = document.createElement('div'); body.className = 'lk-body'; $('lkBody').replaceChildren(body); lock.mount(body); // conteneur neuf : les écouteurs d'un verrou précédent ne survivent pas
   $('lkClue').textContent = lock.clueText && G.clues.has(id) ? `◇ Indice capté : ${lock.clueText()}` : '';
-  releaseLock(); $('lock').classList.add('on'); G.vel.set(0, 0, 0); sfx.tick();
+  releaseLock(); $('lock').classList.add('on'); G.vel.set(0, 0, 0); sfx.tick(); playVoice(id);
   onKey(e => { if (e.code === 'Escape') { closeLock(); return true; } if (e.code === 'KeyM') return false; lock?.key(e); return true; });
   return true;
 }
-function closeLock(silent) { if (!lock && !silent) return; lock = null; G.lockId = null; $('lock').classList.remove('on'); onKey(null); if (!silent && G.phase === 'playing' && !touchMode) requestLock(canvas); }
+function closeLock(silent) { stopVoice(); if (!lock && !silent) return; lock = null; G.lockId = null; $('lock').classList.remove('on'); onKey(null); if (!silent && G.phase === 'playing' && !touchMode) requestLock(canvas); }
 function deny(msg, raise = true) {
   if (raise) { G.denied++; G.alert = Math.min(ALERT.max, G.alert + ALERT.perDeny); }
   sfx.deny(); G.trauma = Math.min(1, G.trauma + 0.3);
@@ -187,15 +188,17 @@ $('bPause').onclick = pause; $('bMute').onclick = () => { initAudio(); mute(); }
 $('bResume').onclick = resume; $('bSound').onclick = mute; $('bQuit').onclick = () => setPhase('menu');
 $('bAgain').onclick = jackIn; $('bMenu').onclick = () => setPhase('menu');
 $('lkClose').onclick = () => closeLock();
+$('lkVoice').onclick = () => { if (G.lockId) playVoice(G.lockId); };
 addEventListener('keydown', e => { if (G.phase === 'paused' && (e.code === 'Escape' || e.code === 'KeyP')) { e.preventDefault(); resume(); } });
 
 // Accroches de test (?qa=1 démarre directement).
-window.__vm = { G, world, music: musicState, musicSeekEnd, get lock() { return lock; }, locks: () => locks, jack: jackIn, open: openLock, close: () => closeLock(),
+window.__vm = { G, world, music: musicState, voice: voiceState, musicSeekEnd, get lock() { return lock; }, locks: () => locks, jack: jackIn, open: openLock, close: () => closeLock(),
   solve: id => { if (!lock || G.lockId !== id) { if (!G.opened.has(id) && id === 'source') for (const n of NODES) if (n.id !== 'source' && !G.opened.has(n.id)) grant(n.id); openLock(id); } if (G.lockId === id) grant(id); return G.opened.has(id); },
   tp: id => { const n = nodeById[id]; G.pos.set(n.x, n.y, n.z + 2.5); G.yaw = 0; G.pitch = 0; G.vel.set(0, 0, 0); },
   tpClue: id => { G.pos.copy(world.clues[id].pos).add(new Vector3(0, 0, 3)); G.yaw = 0; G.pitch = 0; },
   setAlert: v => { G.alert = v; G.alertLvl = alertLevel(v); }, secret: id => locks[id]?.secret(), fps: () => world.fps, waitT: s => new Promise(r => { const end = G.t + s; const f = () => (G.t >= end ? r(G.t) : requestAnimationFrame(f)); f(); }) };
 initMusic();
+initVoice(on => { duckMusic(on); $('lkVoice').classList.toggle('on', on); });
 setPhase('menu');
 requestAnimationFrame(frame);
 if (qs.get('qa') === '1') jackIn();

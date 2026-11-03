@@ -38,10 +38,14 @@ Miroir possible : https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages via
 ## Musique
 Quatre pistes d'ambiance composées par Pascal (`music/`, MP3 128 kb/s) : **theme-1** et **theme-2** jouent au menu et en vol calme, **escape-1** et **escape-2** prennent le relais dès que le pare-feu atteint le niveau 2 et pendant le verrou SOURCE. Le passage se fait en fondu enchaîné de 2,5 s, et chaque liste tourne en boucle. La musique démarre au premier clic ou à la première touche (règle d'autolecture des navigateurs) et elle est lue en streaming. Les effets synthétisés jouent par-dessus, et M ou le bouton ♪ coupent tout.
 
+## Voix de la machine
+Chaque verrou a sa consigne vocale (`voice/machine_puzzle_0X_*.mp3`, mono 64 kb/s, 5,6 à 8,9 s, 339 Ko au total). Elle joue une fois à l'ouverture du verrou, la musique baisse à 35 % pendant qu'elle parle puis remonte, et quitter le verrou la coupe. La rouvrir rejoue la consigne ; le bouton **◉ voix** de l'en-tête (qui pulse pendant la lecture) la rejoue aussi. M et le bouton ♪ coupent aussi la voix. Un seul élément `<audio>` est réutilisé et débloqué au premier geste, ce qui permet la lecture sur iOS (le déblocage joue 10 ms de silence intégré, aucun téléchargement). Si un fichier manque, le verrou fonctionne normalement, en silence.
+
 ## Lancer en local
 ```sh
 node tools/serve.js      # http://localhost:8642/   (?qa=1 = démarrage direct, ?seed=n = énigmes reproductibles)
 node tools/test.cjs      # vérification Playwright, ordi + mobile
 node tools/test-music.cjs  # musique : 1er geste, bascule d'alerte, rotation, sourdine
+node tools/test-voice.cjs  # voix : bon fichier par verrou, musique baissée, fermeture, sourdine, fichier manquant
 ```
 `index.html` est à la racine du dépôt et tous les chemins sont relatifs : le dépôt est publiable tel quel (GitHub Pages, branche `main`, dossier `/` ; `.nojekyll` désactive Jekyll). Le jeu n'a ni étape de build ni dépendance : three.js r170 est inclus dans `vendor/`, et les polices Orbitron et Share Tech Mono (licence OFL) dans `fonts/`.
