@@ -29,7 +29,7 @@ export function bindInput(canvas, { onLockLost, canLock }) {
   addEventListener('mousemove', e => { if (document.pointerLockElement) { look.x += e.movementX; look.y += e.movementY; } });
   // Regard tactile : glisser sur la moitié droite.
   let drag = null;
-  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; if (e.clientX > innerWidth * 0.46) { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture?.(e.pointerId); } });
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; if (e.clientX > innerWidth * 0.46) { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { canvas.setPointerCapture(e.pointerId); } catch {} } });
   canvas.addEventListener('pointermove', e => { if (drag && e.pointerId === drag.id) { look.x += (e.clientX - drag.x) * 1.6; look.y += (e.clientY - drag.y) * 1.6; drag.x = e.clientX; drag.y = e.clientY; } });
   const end = e => { if (drag && e.pointerId === drag.id) drag = null; };
   canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
@@ -40,7 +40,7 @@ export const pointerLocked = () => !!document.pointerLockElement;
 
 export function bindTouch(joy, knob, up, down, hackBtn) {
   const R = 54; let id = null, cx = 0, cy = 0;
-  joy.addEventListener('pointerdown', e => { id = e.pointerId; const r = joy.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; joy.setPointerCapture(e.pointerId); mv(e); e.preventDefault(); });
+  joy.addEventListener('pointerdown', e => { id = e.pointerId; const r = joy.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; try { joy.setPointerCapture(e.pointerId); } catch {} mv(e); e.preventDefault(); });
   const mv = e => { if (e.pointerId !== id) return; let dx = e.clientX - cx, dy = e.clientY - cy; const l = Math.hypot(dx, dy); if (l > R) { dx *= R / l; dy *= R / l; } touch.jx = dx / R; touch.jy = -dy / R; knob.style.transform = `translate(${dx}px,${dy}px)`; };
   joy.addEventListener('pointermove', mv);
   const stop = e => { if (e.pointerId !== id) return; id = null; touch.jx = touch.jy = 0; knob.style.transform = ''; };
