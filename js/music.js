@@ -1,0 +1,41 @@
+// Musique d'ambiance (pistes de Pascal) : deux lecteurs <audio> en streaming, fondu enchaîné.
+// « theme » au menu et en vol calme, « escape » quand le pare-feu monte (niv. ≥ 2) ou au verrou SOURCE.
+const LISTS = { theme: ['music/theme-1.mp3', 'music/theme-2.mp3'], escape: ['music/escape-1.mp3', 'music/escape-2.mp3'] };
+const VOL = 0.55, FADE = 2.5, TAIL = 2.5, CALM_AFTER = 4; // s
+const idx = { theme: 0, escape: 0 };
+let decks = [], cur = -1, mood = 'theme', want = 'theme', unlocked = false, muted = false, calmSince = 0, fading = null;
+
+function deck() { const a = new Audio(); a.preload = 'none'; a.crossOrigin = 'anonymous'; a.volume = 0; a.addEventListener('error', () => { a.dataset.err = '1'; }); return a; }
+function start(m) {
+  const a = decks[cur = cur < 0 ? 0 : 1 - cur], b = decks[1 - cur], list = LISTS[m];
+  mood = m; a.src = list[idx[m] % list.length]; idx[m]++; a.dataset.mood = m; a.preload = 'auto'; a.currentTime = 0; a.volume = 0; a.muted = muted;
+  a.play().catch(() => { unlocked = false; }); // relancé au prochain geste
+  fading = { in: a, out: b.src && !b.paused ? b : null, v0: b.volume, t0: performance.now() };
+}
+function tick() {
+  requestAnimationFrame(tick);
+  if (!unlocked) return;
+  const now = performance.now() / 1000;
+  if (want !== mood) { if (want === 'escape' || now - calmSince > CALM_AFTER) start(want); }
+  const a = decks[cur];
+  if (a && !fading && a.duration && a.duration - a.currentTime < TAIL) start(mood); // piste suivante de la liste
+  if (fading) {
+    const k = Math.min(1, (performance.now() - fading.t0) / (FADE * 1000));
+    fading.in.volume = VOL * k; if (fading.out) fading.out.volume = fading.v0 * (1 - k);
+    if (k >= 1) { if (fading.out) { fading.out.pause(); fading.out.preload = 'none'; } fading = null; }
+  }
+}
+function unlock() {
+  if (unlocked) return; unlocked = true;
+  const a = decks[cur];
+  if (a?.src && a.paused) a.play().catch(() => { unlocked = false; }); else if (!a?.src) start(want);
+}
+export function initMusic() {
+  decks = [deck(), deck()];
+  for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, unlock, { capture: true, passive: true });
+  requestAnimationFrame(tick);
+}
+export function setMood(m) { if (m !== want) { want = m; if (m === 'theme') calmSince = performance.now() / 1000; } }
+export function setMusicMuted(m) { muted = m; decks.forEach(d => { d.muted = m; }); }
+export const musicSeekEnd = () => { const a = decks[cur]; if (a?.duration) a.currentTime = a.duration - TAIL - 0.5; }; // test
+export const musicState = () => { const a = decks[cur]; return { unlocked, mood, want, muted, src: a?.src.split('/').pop() || null, playing: !!a && !a.paused, time: a ? a.currentTime : 0, vol: a ? a.volume : 0, other: decks[1 - cur] ? { src: decks[1 - cur].src.split('/').pop(), playing: !decks[1 - cur].paused, vol: decks[1 - cur].volume } : null, err: decks.some(d => d.dataset.err) }; };

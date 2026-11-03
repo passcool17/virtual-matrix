@@ -2,6 +2,7 @@
 import { Vector3 } from '../vendor/three.module.min.js';
 import { CFG, NODES, CLUES, ALERT, alertLevel, BEST_KEY } from './config.js';
 import { initAudio, setMuted, sfx } from './audio.js';
+import { initMusic, setMood, setMusicMuted, musicState, musicSeekEnd } from './music.js';
 import { startRain } from './rain2d.js';
 import { bindInput, bindTouch, readInput, onKey, isTouch, requestLock, releaseLock, pointerLocked } from './input.js';
 import { createWorld } from './world.js';
@@ -41,7 +42,7 @@ function newRun() {
 function jackIn() { initAudio(); sfx.jack(); newRun(); setPhase('playing'); G.trauma = 0.5; if (!touchMode) requestLock(canvas); }
 const resume = () => { initAudio(); setPhase('playing'); if (!touchMode && !lock) requestLock(canvas); };
 const pause = () => { if (G.phase !== 'playing') return; closeLock(true); setPhase('paused'); $('pInfo').textContent = `Verrous ouverts ${G.opened.size}/6 · ${fmt(G.runT)} · ${G.denied} DENIED`; };
-const mute = () => { G.muted = !G.muted; setMuted(G.muted); $('bMute').textContent = G.muted ? '♪̸' : '♪'; $('bMute').setAttribute('aria-label', G.muted ? 'Activer le son' : 'Couper le son'); $('bSound').firstChild.textContent = G.muted ? 'Son coupé' : 'Son activé'; };
+const mute = () => { G.muted = !G.muted; setMuted(G.muted); setMusicMuted(G.muted); $('bMute').textContent = G.muted ? '♪̸' : '♪'; $('bMute').setAttribute('aria-label', G.muted ? 'Activer le son' : 'Couper le son'); $('bSound').firstChild.textContent = G.muted ? 'Son coupé' : 'Son activé'; };
 
 // ---------- verrous ----------
 function lockCtx(id) {
@@ -171,6 +172,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
   if (G.phase === 'playing') { step(dt); hud(); }
+  if (G.phase !== 'paused') setMood(G.phase === 'playing' && (G.alertLvl >= 2 || G.lockId === 'source') ? 'escape' : 'theme');
   if (G.phase === 'playing' || G.phase === 'paused') { $('flash').style.opacity = (G.trauma * G.trauma * 0.42).toFixed(3); world.render(G, G.phase === 'playing' ? dt : 0); }
   requestAnimationFrame(frame);
 }
@@ -187,11 +189,12 @@ $('lkClose').onclick = () => closeLock();
 addEventListener('keydown', e => { if (G.phase === 'paused' && (e.code === 'Escape' || e.code === 'KeyP')) { e.preventDefault(); resume(); } });
 
 // Accroches de test (?qa=1 démarre directement).
-window.__vm = { G, world, get lock() { return lock; }, locks: () => locks, jack: jackIn, open: openLock, close: () => closeLock(),
+window.__vm = { G, world, music: musicState, musicSeekEnd, get lock() { return lock; }, locks: () => locks, jack: jackIn, open: openLock, close: () => closeLock(),
   solve: id => { if (!lock || G.lockId !== id) { if (!G.opened.has(id) && id === 'source') for (const n of NODES) if (n.id !== 'source' && !G.opened.has(n.id)) grant(n.id); openLock(id); } if (G.lockId === id) grant(id); return G.opened.has(id); },
   tp: id => { const n = nodeById[id]; G.pos.set(n.x, n.y, n.z + 2.5); G.yaw = 0; G.pitch = 0; G.vel.set(0, 0, 0); },
   tpClue: id => { G.pos.copy(world.clues[id].pos).add(new Vector3(0, 0, 3)); G.yaw = 0; G.pitch = 0; },
   setAlert: v => { G.alert = v; G.alertLvl = alertLevel(v); }, secret: id => locks[id]?.secret(), fps: () => world.fps, waitT: s => new Promise(r => { const end = G.t + s; const f = () => (G.t >= end ? r(G.t) : requestAnimationFrame(f)); f(); }) };
+initMusic();
 setPhase('menu');
 requestAnimationFrame(frame);
 if (qs.get('qa') === '1') jackIn();

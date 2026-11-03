@@ -35,7 +35,7 @@ async function run(kind) {
   const opened = () => ev(() => [...__vm.G.opened]);
   const deniedCount = () => ev(() => __vm.G.denied);
   const openNear = async id => { await ev(id => __vm.tp(id), id); await waitT(0.25); if (mobile) await p.tap('#tHack'); else await p.keyboard.press('KeyE'); await p.waitForFunction(id => __vm.G.lockId === id, id, { timeout: 20000 }); };
-  const solvedBy = async (id, how) => { await p.waitForFunction(id => __vm.G.opened.has(id), id, { timeout: 30000 }).catch(() => {}); ok(`${px} ${id} résolu (${how})`, (await opened()).includes(id)); };
+  const solvedBy = async (id, how) => { await p.waitForFunction(id => __vm.G.opened.has(id), id, { timeout: 30000 }).catch(() => {}); const st = await ev(() => JSON.stringify({ phase: __vm.G.phase, lock: __vm.G.lockId, alert: +__vm.G.alert.toFixed(2), lvl: __vm.G.alertLvl, sent: __vm.G.sentinel.on, opened: [...__vm.G.opened], msg: document.getElementById('lkMsg').textContent })); const o = (await opened()).includes(id); ok(`${px} ${id} résolu (${how})`, o, o ? '' : st); };
   const pressPulse = async () => { await p.waitForFunction(() => { const t = __vm.G.t, P = __vm.G.pulse, k = Math.round(t / P); return Math.abs(t - k * P) < 0.07 && k !== window.__lastK && (window.__lastK = k, true); }, null, { timeout: 20000, polling: 'raf' });
     if (mobile) await p.tap('#lkBody [data-act="hit"]'); else await p.keyboard.press('Space'); };
 

@@ -14,6 +14,7 @@ Voir README.md. Les touches sont lues par `event.code`. La version mobile utilis
 - Les 6 verrous sont jouables, ainsi que les 2 indices du monde.
 - Pare-feu à 3 niveaux et sentinelle voleuse de fragments.
 - Score = temps + DENIED, enregistré dans localStorage (`vm-lockdown-best`).
+- Musique de Pascal : thème ↔ escape (pare-feu ≥ 2 ou SOURCE), fondu de 2,5 s, rotation, démarrage au premier geste, streaming (`js/music.js`).
 - Résolution adaptative : la définition baisse sous 28 img/s.
 - Accroches de test : `window.__vm` (`solve`, `open`, `tp`, `tpClue`, `setAlert`, `secret`, `waitT`). `?qa=1` lance la partie directement et `?seed=n` rend les énigmes reproductibles.
 
