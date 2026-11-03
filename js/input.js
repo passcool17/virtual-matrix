@@ -1,7 +1,7 @@
 // Entrées : clavier (event.code), souris (pointer lock), manette, tactile.
 export const keys = new Set();
 const look = { x: 0, y: 0 }, touch = { jx: 0, jy: 0, rise: 0 };
-let pulses = { hack: false, pause: false, mute: false }, keyHook = null, lockWanted = false, gpPrev = [];
+let pulses = { hack: false, pause: false, mute: false }, keyHook = null, lockWanted = false, exiting = false, gpPrev = [];
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window && navigator.maxTouchPoints > 0;
 export const onKey = fn => { keyHook = fn; };
 export const pressHack = () => { pulses.hack = true; };
@@ -21,7 +21,11 @@ export function bindInput(canvas, { onLockLost, canLock }) {
   addEventListener('keyup', e => keys.delete(e.code));
   addEventListener('blur', () => keys.clear());
   canvas.addEventListener('click', () => { if (!isTouch() && canLock()) requestLock(canvas); });
-  document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && lockWanted) { lockWanted = false; onLockLost(); } });
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement) { if (!lockWanted) { exiting = true; document.exitPointerLock(); } return; } // verrou arrivé après un release (course)
+    if (exiting) { exiting = false; if (lockWanted) requestLock(canvas); return; } // sortie demandée par nous : pas une perte
+    if (lockWanted) { lockWanted = false; onLockLost(); }
+  });
   addEventListener('mousemove', e => { if (document.pointerLockElement) { look.x += e.movementX; look.y += e.movementY; } });
   // Regard tactile : glisser sur la moitié droite.
   let drag = null;
@@ -30,8 +34,8 @@ export function bindInput(canvas, { onLockLost, canLock }) {
   const end = e => { if (drag && e.pointerId === drag.id) drag = null; };
   canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
 }
-export function requestLock(el) { try { lockWanted = true; const p = el.requestPointerLock?.(); p?.catch?.(() => { lockWanted = false; }); } catch { lockWanted = false; } }
-export function releaseLock() { lockWanted = false; if (document.pointerLockElement) document.exitPointerLock(); }
+export function requestLock(el) { lockWanted = true; if (document.pointerLockElement === el || exiting) return; try { const p = el.requestPointerLock?.(); p?.catch?.(() => { lockWanted = false; }); } catch { lockWanted = false; } }
+export function releaseLock() { lockWanted = false; if (document.pointerLockElement && !exiting) { exiting = true; document.exitPointerLock(); } }
 export const pointerLocked = () => !!document.pointerLockElement;
 
 export function bindTouch(joy, knob, up, down, hackBtn) {

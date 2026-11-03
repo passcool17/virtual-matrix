@@ -57,12 +57,13 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 .hud-box b { color: var(--primary); font-size: 13px; }
 .lbl { font-size: 10px; letter-spacing: .2em; }
 .hud-btn { pointer-events: auto; min-width: 44px; height: 44px; padding: 0 12px; border: 1px solid var(--border); background: rgba(4,8,6,.7); color: var(--fg); font-family: Orbitron; font-size: 11px; letter-spacing: .1em; }
-.alert { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 58px); left: max(12px, env(safe-area-inset-left)); flex-direction: row; align-items: center; gap: 6px; }
+.hud-left { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.alert { flex-direction: row; align-items: center; gap: 6px; }
 .alert i { width: 16px; height: 8px; border: 1px solid var(--dim); display: inline-block; }
 .alert[data-l="1"] i:nth-of-type(-n+1), .alert[data-l="2"] i:nth-of-type(-n+2), .alert[data-l="3"] i:nth-of-type(-n+3) { background: var(--red); border-color: var(--red); box-shadow: 0 0 8px var(--red); }
 .alert[data-l="3"] { color: var(--red); animation: blink .6s steps(2) infinite; } .alert[data-l="3"] .lbl, .alert[data-l="3"] span { color: var(--red); }
 @keyframes blink { 50% { border-color: var(--red); } }
-.hud-frags { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 96px); left: max(12px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
+.hud-frags { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
 .hud-frags b { color: var(--primary); } .hud-frags .clue { color: #c8ffd4; }
 #radar { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: 12px; width: 132px; height: 132px; border: 1px solid var(--border); border-radius: 50%; background: rgba(4,8,6,.6); }
 .vm-reticle { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 1px solid rgba(93,255,138,.6); border-radius: 50%; }

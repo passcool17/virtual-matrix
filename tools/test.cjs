@@ -29,7 +29,7 @@ async function run(kind) {
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   const shot = n => p.screenshot({ path: `${SHOTS}/${px}-${n}.png` });
   const ev = (f, a) => p.evaluate(f, a);
-  const waitT = s => ev(s => __vm.waitT(s), s);
+  const waitT = s => ev(s => Promise.race([__vm.waitT(s), new Promise((_, rej) => setTimeout(() => rej(new Error(`waitT(${s}) bloqué : phase=${__vm.G.phase} lock=${__vm.G.lockId} ptr=${!!document.pointerLockElement}`)), 240000))]), s);
   const tapOrClick = sel => (mobile ? p.tap(sel) : p.click(sel));
   const act = a => tapOrClick(`#lkBody [data-act="${a}"]`);
   const opened = () => ev(() => [...__vm.G.opened]);

@@ -19,15 +19,17 @@
   <!-- HUD -->
   <div id="hud" class="layer">
     <header class="hud-top">
-      <div class="vm-bracket hud-box"><b class="disp">VIRTUAL MATRIX</b><span id="hCoords">X 0 Y 0 Z 0</span></div>
+      <div class="hud-left">
+        <div class="vm-bracket hud-box"><b class="disp">VIRTUAL MATRIX</b><span id="hCoords">X 0 Y 0 Z 0</span></div>
+        <div id="hAlert" class="vm-bracket hud-box alert"><span class="lbl">PARE-FEU</span><i></i><i></i><i></i><span id="hAlertTxt">calme</span></div>
+        <div id="hFrags" class="hud-frags"></div>
+      </div>
       <div class="hud-right">
         <div class="vm-bracket hud-box"><span class="lbl">VERROUS</span><b id="hNodes" class="disp">0/6</b><span id="hTime">0:00</span></div>
         <button id="bMute" class="hud-btn" type="button" aria-label="Couper le son">♪</button>
         <button id="bPause" class="hud-btn" type="button">Pause</button>
       </div>
     </header>
-    <div id="hAlert" class="vm-bracket hud-box alert"><span class="lbl">PARE-FEU</span><i></i><i></i><i></i><span id="hAlertTxt">calme</span></div>
-    <div id="hFrags" class="hud-frags"></div>
     <canvas id="radar" width="132" height="132" aria-label="Radar"></canvas>
     <div class="vm-reticle"></div>
     <div id="hPrompt" class="hud-prompt"></div>
