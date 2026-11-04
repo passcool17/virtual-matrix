@@ -8,6 +8,7 @@ import { startRain } from './rain2d.js';
 import { bindInput, bindTouch, readInput, onKey, isTouch, requestLock, releaseLock, pointerLocked } from './input.js';
 import { createWorld } from './world.js';
 import { LOCKS, PULSE } from './locks.js';
+import { SENT, makeSentries, resetSentries, stepSentries, inCone } from './sentinel.js';
 
 const $ = id => document.getElementById(id), app = $('app'), canvas = $('gl');
 const qs = new URLSearchParams(location.search);
@@ -18,7 +19,7 @@ const nodeById = Object.fromEntries(NODES.map((n, i) => [n.id, { ...n, n: i + 1 
 const touchMode = isTouch(); app.classList.toggle('touch', touchMode);
 
 const G = { phase: 'boot', t: 0, runT: 0, pos: new Vector3(), vel: new Vector3(), yaw: 0, pitch: 0, trauma: 0, opened: new Set(), order: [], frags: {}, clues: new Set(),
-  alert: 0, alertLvl: 0, redMix: 0, denied: 0, near: null, lockId: null, pulse: PULSE, sentinel: { on: false, pos: new Vector3() }, muted: false, endAt: 0, banner: 0, toast: 0, rnd: Math.random };
+  alert: 0, alertLvl: 0, redMix: 0, denied: 0, near: null, lockId: null, pulse: PULSE, sentinel: { on: false, pos: new Vector3() }, sentries: makeSentries(), muted: false, endAt: 0, banner: 0, toast: 0, rnd: Math.random };
 const world = createWorld(canvas);
 let locks = {}, lock = null, denyLines = [];
 
@@ -35,7 +36,7 @@ const bestText = b => (b ? `${fmt(b.t)} · ${b.denied}✕` : '—');
 
 function newRun() {
   G.rnd = mulberry(seed++); G.t = 0; G.runT = 0; G.pos.set(...CFG.start); G.vel.set(0, 0, 0); G.yaw = 0; G.pitch = 0; G.trauma = 0;
-  G.opened = new Set(); G.order = []; G.frags = {}; G.clues = new Set(); G.alert = 0; G.alertLvl = 0; G.redMix = 0; G.denied = 0; G.sentinel.on = false; G.endAt = 0;
+  G.opened = new Set(); G.order = []; G.frags = {}; G.clues = new Set(); G.alert = 0; G.alertLvl = 0; G.redMix = 0; G.denied = 0; G.sentinel.on = false; resetSentries(G.sentries); G.endAt = 0;
   locks = {}; for (const n of NODES) { world.setNode(n.id, false); if (n.id !== 'source') locks[n.id] = LOCKS[n.id](lockCtx(n.id)); }
   CLUES.forEach(c => world.setClue(c.id, locks[c.id].clueLines()));
   clearDenied(); closeLock(true); hud(true);
@@ -134,6 +135,10 @@ function step(dt) {
     } else S.pos.addScaledVector(d.normalize(), ALERT.sentinelSpeed * (lock ? 0.35 : 1) * dt);
     for (const k of ['x', 'z']) { if (S.pos[k] > CFG.wrap) S.pos[k] -= 2 * CFG.wrap; if (S.pos[k] < -CFG.wrap) S.pos[k] += 2 * CFG.wrap; }
   }
+  // sentinelles de patrouille : figées tant qu'un verrou est ouvert ; la 1re devient la chasseuse du niveau 3
+  const S0 = G.sentries[0]; if (S.on && !S0.hidden) S0.hidden = true; else if (!S.on && S0.hidden) { S0.hidden = false; S0.pos.copy(S.pos); S0.state = 'return'; S0.cool = SENT.cool; }
+  stepSentries(G.sentries, dt, { G, frozen: !!lock, safe: p => NODES.some(n => wrapDelta(p, tmp.set(n.x, n.y, n.z).clone()).length() < SENT.safe), wrap: (a, b) => wrapDelta(a, b).clone(), beep: k => sfx.scan(k), alarm: sentryAlarm });
+  for (const s of G.sentries) for (const k of ['x', 'z']) { if (s.pos[k] > CFG.wrap) s.pos[k] -= 2 * CFG.wrap; if (s.pos[k] < -CFG.wrap) s.pos[k] += 2 * CFG.wrap; }
   G.trauma = Math.max(0, G.trauma - 1.8 * dt);
   lock?.update(G.t);
   denyLines = denyLines.filter(d => (d.until > G.t ? true : (d.el.remove(), false)));
@@ -142,6 +147,7 @@ function step(dt) {
   if (G.endAt && G.t >= G.endAt) { G.endAt = 0; complete(); }
 }
 
+function sentryAlarm() { G.alert = Math.min(ALERT.max, G.alert + 1); G.alertLvl = alertLevel(G.alert); G.sentAlarms = (G.sentAlarms || 0) + 1; G.trauma = Math.min(1, G.trauma + 0.5); sfx.deny(); toast('⚠ SENTINELLE · repéré — pare-feu +1'); hud(true); }
 let hudT = 0;
 function hud(force) {
   if (!force && G.t - hudT < 0.1) return; hudT = G.t;
@@ -155,6 +161,7 @@ function hud(force) {
   else if (n) { const srcLocked = n.id === 'source' && G.opened.size < 5 && !G.opened.has('source');
     P.innerHTML = G.opened.has(n.id) ? `${n.title} · ouvert` : srcLocked ? `${n.title} · ${5 - G.opened.size} verrou(s) requis` : `VERROU ${n.title}<small>${touchMode ? 'Appuie DÉCODER' : 'Appuie E — crocheter'} · ${G.nearDist.toFixed(1)} m</small>`; }
   else { const t = NODES.map(x => ({ x, d: wrapDelta(G.pos, new Vector3(x.x, x.y, x.z)).length() })).filter(o => !G.opened.has(o.x.id)).sort((a, b) => a.d - b.d)[0]; P.innerHTML = t ? `<small>SIGNAL ${t.x.title} · ${t.d.toFixed(0)} m</small>` : ''; }
+  { const d = Math.max(0, ...G.sentries.map(s => (s.active && !s.hidden && !lock ? s.detect : 0))), el = $('hSent'); el.classList.toggle('on', d > 0.04); el.style.setProperty('--d', d.toFixed(2)); }
   $('tHack').classList.toggle('ready', !!G.near && !G.opened.has(G.near));
   app.classList.toggle('locked', pointerLocked());
   if (!touchMode) radar();
@@ -167,6 +174,7 @@ function radar() {
   for (const n of NODES) plot(new Vector3(n.x, n.y, n.z), G.opened.has(n.id) ? '#9dffc0' : n.id === 'source' && G.opened.size < 5 ? '#3d5c44' : '#ff8a80', G.near === n.id ? 5 : 3.5);
   for (const cl of CLUES) if (!G.clues.has(cl.id)) plot(world.clues[cl.id].pos, '#c8ffd4', 2);
   if (G.sentinel.on) plot(G.sentinel.pos, '#ff3b30', 5);
+  for (const s of G.sentries) if (s.active && !s.hidden) plot(s.pos, '#b0201a', 4);
   rc.fillStyle = '#5dff8a'; rc.beginPath(); rc.moveTo(c, c - 6); rc.lineTo(c - 4, c + 4); rc.lineTo(c + 4, c + 4); rc.fill();
 }
 
@@ -196,6 +204,8 @@ window.__vm = { G, world, music: musicState, voice: voiceState, musicSeekEnd, ge
   solve: id => { if (!lock || G.lockId !== id) { if (!G.opened.has(id) && id === 'source') for (const n of NODES) if (n.id !== 'source' && !G.opened.has(n.id)) grant(n.id); openLock(id); } if (G.lockId === id) grant(id); return G.opened.has(id); },
   tp: id => { const n = nodeById[id]; G.pos.set(n.x, n.y, n.z + 2.5); G.yaw = 0; G.pitch = 0; G.vel.set(0, 0, 0); },
   tpClue: id => { G.pos.copy(world.clues[id].pos).add(new Vector3(0, 0, 3)); G.yaw = 0; G.pitch = 0; },
+  sentries: () => G.sentries, inCone: i => inCone(G.sentries[i], G.pos), renderInfo: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles }),
+  tpSentry: (i, dist = 9) => { const s = G.sentries[i]; G.pos.copy(s.pos).add(s.dir.clone().setY(0).normalize().multiplyScalar(dist * Math.cos(SENT.tilt))).add(new Vector3(0, -dist * Math.sin(SENT.tilt), 0)); G.yaw = Math.atan2(s.dir.x, s.dir.z); G.pitch = 0; G.vel.set(0, 0, 0); },
   setAlert: v => { G.alert = v; G.alertLvl = alertLevel(v); }, secret: id => locks[id]?.secret(), fps: () => world.fps, waitT: s => new Promise(r => { const end = G.t + s; const f = () => (G.t >= end ? r(G.t) : requestAnimationFrame(f)); f(); }) };
 initMusic();
 initVoice(on => { duckMusic(on); $('lkVoice').classList.toggle('on', on); });

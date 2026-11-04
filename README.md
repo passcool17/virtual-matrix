@@ -15,6 +15,7 @@ Miroir possible : https://passcool17.gitlab.io/virtual-matrix/ (GitLab Pages via
    - niveau 1 : la pluie devient rouge ;
    - niveau 2 : le brouillard se resserre ;
    - niveau 3 : une **sentinelle** te traque. Si elle te touche, elle vole ton dernier fragment, referme son verrou et te repousse.
+   - Des **sentinelles** patrouillent (une seconde dès le niveau 2). Si tu restes environ 1,5 s dans leur cône rouge, l'alerte « SENTINELLE · détection » se remplit puis le pare-feu monte d'un cran ; elle te poursuit quelques secondes puis perd ta trace si tu t'éloignes. Elles ne bougent pas pendant un verrou et ne te repèrent jamais près d'un nœud.
 6. Ton score, c'est ton **temps** plus le nombre de **DENIED**. Ton meilleur score est enregistré sur ton appareil.
 
 | Verrou | Énigme |

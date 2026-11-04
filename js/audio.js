@@ -23,6 +23,7 @@ export const sfx = {
   decode: () => { tone(220, 0.18, 'sawtooth', 0.22, 420); tone(880, 0.12, 'square', 0.08, -200); },
   deny: () => { tone(90, 0.14, 'square', 0.12, -30); tone(70, 0.22, 'sawtooth', 0.08, -20, 0.08); },
   complete: () => { tone(220, 0.4, 'triangle', 0.18, 220); tone(330, 0.55, 'sine', 0.14, 330); tone(495, 0.7, 'sine', 0.1, 200); },
+  scan: k => tone(1300 + 700 * k, 0.07, 'square', 0.035 + 0.04 * k),
   key: () => tone(1200, 0.04, 'square', 0.04),
   tick: () => tone(660, 0.06, 'triangle', 0.06),
   granted: () => { tone(440, 0.2, 'square', 0.08); tone(660, 0.3, 'triangle', 0.12, 0, 0.1); tone(990, 0.5, 'sine', 0.12, 0, 0.22); },

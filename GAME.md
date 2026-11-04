@@ -13,6 +13,7 @@ Voir README.md. Les touches sont lues par `event.code`. La version mobile utilis
 - Monde recréé avec les valeurs de l'original : vitesse 14, turbo ×2,05, bouclage ±36, altitude 1,2 à 42, portée de 3,6 m, et les mêmes couleurs, polices, effets et sons synthétisés.
 - Les 6 verrous sont jouables, ainsi que les 2 indices du monde.
 - Pare-feu à 3 niveaux et sentinelle voleuse de fragments.
+- Sentinelles de patrouille (js/sentinel.js) : modèle procédural instancié (tête en plaques, 7 yeux rouges, mandibules, 12 tentacules à anneaux, ~7 draw calls), cône de recherche rouge. 1,5 s dans le cône → « SENTINELLE · détection », pare-feu +1, courte poursuite, recharge 10 s. Figées pendant un verrou, zone sûre de 5 m autour des nœuds, grâce de 10 s en début de run, 2e sentinelle au pare-feu ≥ 2. Au niveau 3 la sentinelle 0 devient la chasseuse. Planent pendant la SOURCE (visuel seul). Test : tools/test-sentinel.cjs.
 - Score = temps + DENIED, enregistré dans localStorage (`vm-lockdown-best`).
 - Musique de Pascal, une piste par étape dans l'ordre 1:53 → 2:05 → 2:13 → 2:16 : menu `escape-1`, vol calme `theme-1`, pare-feu ≥ 2 `escape-2`, verrou final SOURCE `theme-2` (l'écran de fin revient à `escape-1`). Fondu de 2,5 s, chaque piste boucle, retour au calme après 4 s sans alerte, démarrage au premier geste, streaming (`js/music.js`).
 - CUILLÈRE adoucie (2026-11-03) : dans l'historique, les chiffres bien placés s'allument en vert à leur position ; les mal placés restent un simple compte. Avant, seul le total « x bien placés · y mal placés » était donné.
@@ -24,6 +25,5 @@ Voir README.md. Les touches sont lues par `event.code`. La version mobile utilis
 ## Prochaines idées
 - Mode « contre-la-montre » quotidien, avec la même graine pour tout le monde.
 - Davantage d'indices écrits dans la pluie : des colonnes qui forment un chiffre.
-- Une deuxième sentinelle au niveau 3+, qui patrouille au lieu de traquer.
 - Des verrous qui se mélangent d'une partie à l'autre (n'importe quelle énigme sur n'importe quel nœud).
 - Un tableau des scores en ligne, si Pascal le veut un jour.

@@ -1,6 +1,7 @@
 // Monde 3D : grille, pluie, noyau, nœuds verrouillés, indices flottants, sentinelle.
 import * as THREE from '../vendor/three.module.min.js';
 import { COL, NODES, CLUES } from './config.js';
+import { createSentinelModel } from './sentinel.js';
 
 const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,255,255,0.45)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
@@ -63,12 +64,10 @@ export function createWorld(canvas) {
   for (const c of CLUES) { const base = NODES.find(n => n.id === c.near); const pos = new THREE.Vector3(base.x + c.off[0], base.y + c.off[1], base.z + c.off[2]); clues[c.id] = { pos, sprite: null }; }
   function setClue(id, lines) { const c = clues[id]; if (c.sprite) scene.remove(c.sprite); c.sprite = textSprite(lines); c.sprite.position.copy(c.pos); scene.add(c.sprite); }
 
-  // Sentinelle
-  const sent = new THREE.Group(); sent.visible = false; scene.add(sent);
-  const sm = new THREE.MeshBasicMaterial({ color: COL.red, wireframe: true });
-  const sOuter = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 0), sm), sInner = new THREE.Mesh(new THREE.OctahedronGeometry(0.6), new THREE.MeshBasicMaterial({ color: 0xffb0a8 }));
-  const spikes = new THREE.Mesh(new THREE.IcosahedronGeometry(1.9, 0), new THREE.MeshBasicMaterial({ color: COL.red, wireframe: true, transparent: true, opacity: 0.35 }));
-  sent.add(sOuter, sInner, spikes, glow(COL.red, 6, 0.7));
+  // Sentinelles (modèle procédural, js/sentinel.js) : 0 = patrouille / chasseuse du niveau 3, 1 = renfort pare-feu ≥ 2.
+  const sents = [createSentinelModel(glow), createSentinelModel(glow)]; sents.forEach(m => { m.group.visible = false; scene.add(m.group); });
+  const hoverPos = new THREE.Vector3(14, 27, -12), look = new THREE.Vector3();
+  function placeSent(m, pos, dir, t, dt, o) { m.group.visible = true; m.group.position.copy(pos); m.group.rotation.set(0, Math.atan2(dir.x, dir.z), 0); m.update(t, dt, o); }
 
   let frames = 0, fpsT = performance.now(), fps = 0;
   function resize() { const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
@@ -95,12 +94,16 @@ export function createWorld(canvas) {
       o.cage.visible = !o.open; o.cage.rotation.y = -t * 0.5; o.cage.rotation.x = t * 0.3;
     }
     for (const id in clues) { const c = clues[id]; if (c.sprite) { c.sprite.material.opacity = (G.clues.has(id) ? 0.55 : 0.75) + Math.sin(t * 3) * 0.2; c.sprite.position.y = c.pos.y + Math.sin(t * 1.3) * 0.25; } }
-    sent.visible = G.sentinel.on; if (sent.visible) { sent.position.copy(G.sentinel.pos); sOuter.rotation.set(t * 1.7, t * 2.3, 0); spikes.rotation.set(-t, t * 0.7, t); sInner.scale.setScalar(1 + Math.sin(t * 12) * 0.15); }
+    const SS = G.sentries || [];
+    sents.forEach((m, i) => { const S = SS[i]; m.group.visible = false; if (!S || (G.lockId && (G.lockId !== 'source' || i))) return; // verrou ouvert : rien à rendre (sauf la menace SOURCE)
+      if (i === 0 && G.lockId === 'source') { look.subVectors(G.pos, hoverPos); placeSent(m, hoverPos, look, t, dt, { speed: 0, detect: 0.35 + 0.25 * Math.sin(t * 2), cone: false }); return; } // menace visuelle pendant la SOURCE
+      if (i === 0 && G.sentinel.on) { look.subVectors(G.pos, G.sentinel.pos); placeSent(m, G.sentinel.pos, look, t, dt, { speed: 9, detect: 1, lunge: 0.6, cone: false }); return; }
+      if (S.active && !S.hidden) placeSent(m, S.pos, S.dir, t, dt, { speed: S.speed, detect: S.cool > 0 ? 0 : S.detect, lunge: S.lunge, cone: S.cool === 0 }); });
     renderer.render(scene, camera);
     frames++; const now = performance.now(); if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now;
       // Résolution adaptative : sous 28 img/s, on réduit la définition (jusqu'à 45 %).
       const next = fps < 28 ? Math.max(0.45, resScale * 0.8) : fps > 55 ? Math.min(1, resScale * 1.1) : resScale;
       if (Math.abs(next - resScale) > 0.01) { resScale = next; renderer.setPixelRatio(baseDpr * resScale); resize(); } }
   }
-  return { render, resize, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; }, get resScale() { return resScale; } };
+  return { render, resize, renderer, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; }, get resScale() { return resScale; } };
 }

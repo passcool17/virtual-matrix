@@ -158,3 +158,9 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
   .term { padding: 12px; } .lk-pulse { width: 130px; height: 130px; }
   .lk-win .g { width: 30px; }
 }
+
+/* Alerte de détection sentinelle */
+.hud-sent { position: absolute; left: 50%; top: calc(50% - 74px); transform: translateX(-50%); padding: 4px 10px 6px; border: 1px solid var(--red, #ff3b30); background: rgba(30,4,4,.7); color: #ff6b60; font-size: 12px; letter-spacing: .12em; opacity: 0; pointer-events: none; text-shadow: 0 0 8px rgba(255,59,48,.7); }
+.hud-sent.on { opacity: 1; animation: sentBlink .5s steps(2) infinite; }
+.hud-sent i { display: block; height: 3px; margin-top: 4px; background: linear-gradient(90deg, #ff3b30 calc(var(--d, 0) * 100%), rgba(255,59,48,.18) 0); }
+@keyframes sentBlink { 50% { border-color: rgba(255,59,48,.35); } }
