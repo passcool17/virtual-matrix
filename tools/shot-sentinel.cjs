@@ -10,8 +10,8 @@ const OUT = '../shots/sentinelle';
     const tag = mobile ? 'mobile' : 'desktop', shot = n => p.screenshot({ path: `${OUT}/${n}-${tag}.png` });
     await p.goto('http://localhost:8642/?qa=1&seed=3'); await p.waitForFunction(() => window.__vm && __vm.G.phase === 'playing', null, { timeout: 120000 });
     // vue de côté : hors du cône (pas de détection)
-    const side = (dist, up) => p.evaluate(([dist, up]) => { const s = __vm.sentries()[0], G = __vm.G; const sx = -s.dir.z, sz = s.dir.x, n = Math.hypot(sx, sz);
-      G.pos.set(s.pos.x + sx / n * dist + s.dir.x * 1.5, s.pos.y + up, s.pos.z + sz / n * dist + s.dir.z * 1.5); const vx = s.pos.x - G.pos.x, vz = s.pos.z - G.pos.z; G.yaw = Math.atan2(-vx, -vz); G.pitch = Math.atan2(s.pos.y - G.pos.y, Math.hypot(vx, vz)); G.vel.set(0, 0, 0); }, [dist, up]);
+    const side = (dist, up) => p.evaluate(([dist, up]) => { const s = __vm.sentries()[0], G = __vm.G; const sx = -Math.cos(s.yaw), sz = Math.sin(s.yaw), n = Math.hypot(sx, sz);
+      G.pos.set(s.pos.x + sx / n * dist + Math.sin(s.yaw) * 1.5, s.pos.y + up, s.pos.z + sz / n * dist + Math.cos(s.yaw) * 1.5); const vx = s.pos.x - G.pos.x, vz = s.pos.z - G.pos.z; G.yaw = Math.atan2(-vx, -vz); G.pitch = Math.atan2(s.pos.y - G.pos.y, Math.hypot(vx, vz)); G.vel.set(0, 0, 0); }, [dist, up]);
     await p.evaluate(() => __vm.waitT(1)); await side(7, 1.5); await p.evaluate(() => __vm.waitT(0.15)); await side(7, 1.5); await shot('gros-plan');
     await side(24, 6); await p.evaluate(() => __vm.waitT(0.15)); await side(24, 6); await shot('patrouille');
     await p.evaluate(() => __vm.waitT(10)); // après la période de grâce

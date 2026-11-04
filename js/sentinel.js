@@ -4,16 +4,12 @@
 import * as THREE from '../vendor/three.module.min.js';
 
 export const SENT = {
-  range: 18, half: 24 * Math.PI / 180, tilt: 0.42, // cône : portée (m), demi-angle, inclinaison vers le bas (rad)
-  detectT: 1.5, cool: 10, chaseT: 5, lose: 26, safe: 5, grace: 10, // secondes / mètres
-  patrol: 4.5, chase: 10, keep: 4,
+  range: 22, half: 30 * Math.PI / 180, tilt: 0.3, eye: 1.5, // cône de vision : longueur (m), demi-angle, inclinaison par défaut, sommet à 1,5 m devant le centre (aux yeux)
+  see: 0.8, grace: 4, safe: 3.6, cool: 8,                   // s de vue pour passer en traque (à bout portant ~0,55 s, au bout du cône ~1,6 s) ; grâce de début ; zone sûre = portée de crochetage
+  sigMin: 4, sigMax: 22, sigOn: 0.12,                        // signature énergétique : rayon de captation 4 → 22 m selon la vitesse ; sous 0,12 (flottement lent) = indétectable
+  lostT: 2.5, searchT: 6, suspT: 5,                          // perte de vue → recherche ; durée de recherche ; soupçon sans confirmation
+  patrol: 5, investigate: 7, hunt: 11.5, catchR: 2.4, catchT: 0.5, stunT: 3,
 };
-// Deux boucles de patrouille, loin des nœuds (les nœuds restent des zones sûres de toute façon).
-const PATHS = [
-  [[0, 15, -30], [27, 17, -14], [30, 14, 18], [10, 18, 31], [-20, 15, 30], [-31, 18, 4], [-27, 15, -24]],
-  [[-12, 31, 12], [12, 33, 14], [16, 30, -10], [-6, 32, -16], [-17, 30, -2]],
-];
-
 // ---------- géométrie ----------
 function merge(parts) { // [[geometry, matrix]] → une géométrie non indexée (position + normale)
   const pos = [], nor = [];
@@ -68,16 +64,17 @@ export function createSentinelModel(glow) {
   // Cône de recherche : sommet aux yeux, axe vers l'avant, incliné vers le bas (comme la détection).
   const L = SENT.range, coneMat = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const coneG = new THREE.ConeGeometry(Math.tan(SENT.half) * L, L, 20, 1, true); coneG.translate(0, -L / 2, 0); coneG.rotateX(-Math.PI / 2); // sommet à l'origine, ouverture vers +Z
-  const cone = new THREE.Mesh(coneG, coneMat); cone.position.set(0, 0, 1.5); cone.rotation.x = SENT.tilt; body.add(cone);
+  const cone = new THREE.Mesh(coneG, coneMat); cone.position.set(0, 0, SENT.eye); cone.rotation.x = SENT.tilt; g.add(cone); // enfant du groupe (pas du corps qui oscille) : le cône visible = le cône de détection
   // Racines des tentacules sur le collier arrière.
   const roots = Array.from({ length: NT }, (_, i) => { const a = (i / NT) * Math.PI * 2 + 0.2; return { a, ph: i * 1.7, rad: new THREE.Vector3(Math.cos(a), Math.sin(a), 0), tan: new THREE.Vector3(-Math.sin(a), Math.cos(a), 0) }; });
   const dir = new THREE.Vector3(), p = new THREE.Vector3(), mid = new THREE.Vector3();
   let speedS = 0;
-  function update(t, dt, o) { // o : { speed, detect 0..1, lunge 0..1, cone }
+  function update(t, dt, o) { // o : { tune (capte une signature),  speed, detect 0..1, lunge 0..1, cone }
     speedS += ((o.speed || 0) - speedS) * Math.min(1, dt * 2); const straight = Math.min(1, speedS / 9);
     body.position.y = Math.sin(t * 1.3) * 0.18; body.rotation.z = Math.sin(t * 0.7) * 0.06;
     const k = 0.12 + 0.88 * (o.detect || 0); eyeMat.color.setRGB(1, 0.23 + 0.6 * k * k, 0.19 + 0.5 * k * k); halo.material.opacity = 0.35 + 0.6 * k; halo.scale.setScalar(2.2 + 2.6 * k);
-    cone.visible = o.cone !== false; coneMat.opacity = 0.05 + 0.13 * k;
+    cone.visible = o.cone !== false; coneMat.opacity = (0.05 + 0.13 * k) * (o.tune ? 0.6 + 0.4 * Math.abs(Math.sin(t * 23)) : 1);
+    if (o.tune) halo.scale.setScalar((2.2 + 2.6 * k) * (1 + 0.35 * Math.abs(Math.sin(t * 17)))); // syntonisation : le halo balaie les fréquences cone.rotation.x = o.tilt ?? SENT.tilt;
     for (let i = 0; i < NT; i++) {
       const r = roots[i]; p.set(r.rad.x * 0.78, r.rad.y * 0.78, -1.2);
       dir.set(r.rad.x * 0.75, r.rad.y * 0.75 - 0.15, -1).normalize();
@@ -99,38 +96,96 @@ export function createSentinelModel(glow) {
 }
 
 // ---------- comportement ----------
-const tv = new THREE.Vector3(), axis = new THREE.Vector3(), fwd = new THREE.Vector3();
-export function makeSentries() {
-  return PATHS.map((path, i) => ({ i, path: path.map(a => new THREE.Vector3(...a)), wp: 1, pos: new THREE.Vector3(...path[0]), dir: new THREE.Vector3(1, 0, 0), state: 'patrol', detect: 0, cool: 0, chase: 0, lunge: 0, speed: 0, active: i === 0, hidden: false, alerts: 0, beepAt: 0 }));
+// États : patrol → suspicious (vu ou entendu : se tourne, va voir) → hunt (poursuite avec interception ; la 2e coupe la route)
+//         → search (balaie autour du dernier point vu) → patrol. stun = brouillée par l'impulsion du joueur.
+const tv = new THREE.Vector3(), tw = new THREE.Vector3(), fwd = new THREE.Vector3(), ax = new THREE.Vector3();
+const mk = i => ({ i, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1), yaw: 0, tilt: SENT.tilt, wp: new THREE.Vector3(), wpId: null, state: 'patrol', stateT: 0,
+  aware: 0, detect: 0, last: new THREE.Vector3(), lastV: new THREE.Vector3(), lost: 0, catchT: 0, stun: 0, cool: 0, lunge: 0, speed: 0, role: 'lead', active: i === 0, hidden: false, alerts: 0, catches: 0, beepAt: 0, heard: 0, seen: false });
+const START = [[-30, 14, -30], [30, 26, 30]];
+export function makeSentries() { const l = [mk(0), mk(1)]; resetSentries(l); return l; }
+export function resetSentries(list) { list.forEach((s, i) => { Object.assign(s, mk(i), { pos: new THREE.Vector3(...START[i]) }); s.wp.copy(s.pos); }); }
+export const yawOf = v => Math.atan2(v.x, v.z);
+// Axe et sommet du cône dans le monde : exactement ceux du maillage (groupe tourné de yaw, cône à SENT.eye devant, incliné de tilt).
+export function coneAxis(s, out = ax) { return out.set(Math.sin(s.yaw) * Math.cos(s.tilt), -Math.sin(s.tilt), Math.cos(s.yaw) * Math.cos(s.tilt)); }
+export function coneApex(s, out = tw) { return out.set(s.pos.x + Math.sin(s.yaw) * SENT.eye, s.pos.y, s.pos.z + Math.cos(s.yaw) * SENT.eye); }
+// rel = vecteur sommet→point (déjà replié). Dans le cône = projection sur l'axe dans ]0, range] et angle ≤ demi-angle.
+function relInCone(s, rel) { const a = coneAxis(s), pr = rel.dot(a), L = rel.length(); return pr > 0 && pr <= SENT.range && pr / Math.max(L, 1e-6) >= Math.cos(SENT.half) ? pr : 0; }
+export function inCone(s, p, wrap) { coneApex(s); const rel = wrap ? wrap(tw, p) : tv.subVectors(p, tw); return relInCone(s, rel) > 0; }
+// Ligne de vue : segment a → a+rel contre les piliers [x, z, r, h] (cylindres verticaux) et les sphères [x, y, z, r].
+export function losClear(a, rel, occ, wrap) {
+  for (const o of occ.pillars) { const d = wrap(a, tv.set(o[0], 0, o[1])); d.y = 0; const rr = rel.x * rel.x + rel.z * rel.z; const t = rr > 1e-6 ? Math.max(0, Math.min(1, (d.x * rel.x + d.z * rel.z) / rr)) : 0;
+    const cx = rel.x * t - d.x, cz = rel.z * t - d.z; if (cx * cx + cz * cz < o[2] * o[2] && a.y + rel.y * t < o[3]) return false; }
+  for (const o of occ.spheres) { const d = wrap(a, tv.set(o[0], o[1], o[2])); const rr = rel.lengthSq(); const t = rr > 1e-6 ? Math.max(0, Math.min(1, d.dot(rel) / rr)) : 0; if (fwd.copy(rel).multiplyScalar(t).sub(d).lengthSq() < o[3] * o[3]) return false; }
+  return true;
 }
-export function resetSentries(list) { list.forEach((s, i) => { s.pos.copy(s.path[0]); s.wp = 1; s.dir.subVectors(s.path[1], s.path[0]).normalize(); s.state = 'patrol'; s.detect = s.cool = s.chase = s.lunge = s.speed = 0; s.alerts = 0; s.active = i === 0; s.hidden = false; }); }
-// Axe du cône dans le monde : direction de la tête inclinée vers le bas.
-export function coneAxis(s, out = axis) { fwd.copy(s.dir).setY(0); if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, 1); fwd.normalize(); return out.copy(fwd).multiplyScalar(Math.cos(SENT.tilt)).setY(-Math.sin(SENT.tilt)).normalize(); }
-export function inCone(s, p) { tv.subVectors(p, s.pos); const d = tv.length(); if (d > SENT.range || d < 0.01) return false; return tv.dot(coneAxis(s)) / d > Math.cos(SENT.half); }
+const go = (s, st) => { if (s.state !== st) { s.state = st; s.stateT = 0; } };
+const turn = (cur, to, k) => { let d = to - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return cur + d * k; };
 
-// ctx : { G, frozen, safe(pos) → bool, alarm(s), beep(k), wrap(v) }
+// ctx : { G, frozen, safe(p), wrap(a,b) → delta (copie), occ, sigR (m : rayon de captation de la signature énergétique), targets() → [Vector3], alarm(s), beep(k), caught(s), rnd() }
 export function stepSentries(list, dt, ctx) {
-  const G = ctx.G;
+  const G = ctx.G, wrap = ctx.wrap; ctx.list = list;
   list[1].active = G.alertLvl >= 2 || list[1].state !== 'patrol';
+  // 1) sens
+  for (const s of list) {
+    s.seen = false; s.heard = 0; s.tuneT = Math.max(0, (s.tuneT || 0) - dt); if (!s.active || s.hidden || ctx.frozen || s.state === 'stun' || G.t < SENT.grace || ctx.safe(G.pos)) continue;
+    const rel = wrap(coneApex(s), G.pos), pr = relInCone(s, rel);
+    if (pr && losClear(tw, rel, ctx.occ, wrap)) { s.seen = true; s.seenK = 1.5 - pr / SENT.range; }
+    if (!s.seen && ctx.sigR > 0 && wrap(s.pos, G.pos).length() < ctx.sigR) { s.heard = 1; s.tuneT = 1.2; }
+  }
+  const hunters = list.filter(s => s.active && !s.hidden && s.state === 'hunt'), teamSees = list.some(s => s.seen);
+  // 2) décision + déplacement
   for (const s of list) {
     if (!s.active || s.hidden || ctx.frozen) { s.speed = 0; continue; }
-    s.cool = Math.max(0, s.cool - dt); s.lunge = Math.max(0, s.lunge - dt * 1.5);
-    const seen = G.t > SENT.grace && s.cool === 0 && !ctx.safe(G.pos) && inCone(s, G.pos);
-    if (seen) s.detect = Math.min(1, s.detect + dt / SENT.detectT); else s.detect = Math.max(0, s.detect - dt / SENT.detectT * 1.5);
-    if (s.detect > 0.05 && G.t >= s.beepAt) { ctx.beep(s.detect); s.beepAt = G.t + 0.55 - 0.35 * s.detect; }
-    if (s.detect >= 1) { s.detect = 0; s.cool = SENT.cool; s.state = 'chase'; s.chase = SENT.chaseT; s.lunge = 1; s.alerts++; ctx.alarm(s); }
-    let target, sp;
-    if (s.state === 'chase') {
-      s.chase -= dt; const d = ctx.wrap(s.pos, G.pos), L = d.length();
-      if (s.chase <= 0 || L > SENT.lose || ctx.safe(G.pos)) s.state = 'return';
-      target = tv.copy(s.pos).add(d); sp = L > SENT.keep ? SENT.chase : 0;
+    s.stateT += dt; s.cool = Math.max(0, s.cool - dt); s.lunge = Math.max(0, s.lunge - dt * 1.5);
+    const toP = wrap(s.pos, G.pos), dP = toP.length();
+    if (s.seen) { s.last.copy(s.pos).add(toP); s.lastV.copy(G.vel); s.lost = 0; }
+    if (s.state === 'stun') { s.stun -= dt; s.speed *= Math.exp(-4 * dt); s.tilt = 0.9; s.aware = 0; if (s.stun <= 0) { go(s, 'search'); s.tilt = SENT.tilt; } }
+    else if (s.state === 'patrol' || s.state === 'suspicious' || s.state === 'search') {
+      if (s.seen) { s.aware = Math.min(1, s.aware + dt / SENT.see * s.seenK); if (s.state !== 'suspicious') { go(s, 'suspicious'); } }
+      else if (s.heard) { s.aware = Math.min(0.9, Math.max(s.aware, 0.35) + dt * 0.2); s.last.copy(s.pos).add(toP); if (s.state !== 'suspicious') go(s, 'suspicious'); else s.stateT = Math.min(s.stateT, 1); }
+      else s.aware = Math.max(0, s.aware - dt * (s.state === 'patrol' ? 0.3 : 0.12));
+      if (s.aware >= 1) startHunt(s, ctx, 'lead');
+      else if (s.state === 'suspicious' && !s.seen && s.stateT > SENT.suspT) go(s, 'search');
+      else if (s.state === 'search' && s.stateT > SENT.searchT) { go(s, 'patrol'); s.wpId = null; }
+    } else if (s.state === 'hunt') {
+      if (!s.seen) { if (teamSees) { const o = list.find(x => x.seen); s.last.copy(o.last); s.lastV.copy(o.lastV); s.lost = 0; } else s.lost += dt; }
+      if (s.lost > SENT.lostT || ctx.safe(G.pos)) { go(s, 'search'); s.aware = 0.5; s.catchT = 0; s.last.addScaledVector(s.lastV, 0.8); }
+      else if (dP < SENT.catchR && s.seen) { s.catchT += dt; s.lunge = 1; if (s.catchT >= SENT.catchT) { s.catchT = 0; s.catches++; ctx.caught(s); go(s, 'search'); s.aware = 0; s.stun = 0; s.cool = Math.max(s.cool, 3); s.last.copy(s.pos); } }
+      else s.catchT = Math.max(0, s.catchT - dt);
     }
-    if (s.state === 'return' || s.state === 'patrol') {
-      target = s.path[s.wp]; sp = SENT.patrol;
-      if (s.pos.distanceTo(target) < 1.5) { s.wp = (s.wp + 1) % s.path.length; s.state = 'patrol'; }
+    s.detect = s.state === 'hunt' ? 1 : s.state === 'stun' ? 0 : s.aware;
+    if ((s.state === 'suspicious' || s.state === 'hunt') && G.t >= s.beepAt) { ctx.beep(s.state === 'hunt' ? 1 : s.aware); s.beepAt = G.t + (s.state === 'hunt' ? 0.22 : 0.55 - 0.3 * s.aware); }
+    // cible
+    let sp = 0, look = null; tv.set(0, 0, 0);
+    if (s.state === 'patrol') {
+      if (!s.wpId || s.pos.distanceTo(s.wp) < 2) pickWp(s, list, ctx);
+      tv.subVectors(s.wp, s.pos); sp = SENT.patrol; fwd.copy(tv); look = yawOf(fwd) + Math.sin(G.t * 0.9 + s.i * 2) * 0.55; s.tilt += (SENT.tilt - s.tilt) * Math.min(1, dt * 2); // balaie de gauche à droite en patrouillant
+    } else if (s.state === 'suspicious' || s.state === 'search') {
+      const at = wrap(s.pos, s.last); tv.copy(at); const d = at.length();
+      sp = s.state === 'suspicious' ? (d > 6 ? SENT.investigate : 0) : (d > 3 ? SENT.investigate : 0);
+      look = s.state === 'search' && d < 4 ? s.yaw + dt * 1.6 : yawOf(at); aimTilt(s, at, dt); // recherche : tourne sur place autour du dernier point vu
+    } else if (s.state === 'hunt') {
+      const lead = Math.min(1.2, dP / SENT.hunt) * (s.role === 'cut' ? 2 : 1);
+      const tgt = tw.copy(s.lost > 0 ? s.last : fwd.copy(s.pos).add(toP)).addScaledVector(s.lost > 0 ? s.lastV : G.vel, lead);
+      if (s.role === 'cut') { const v = fwd.copy(G.vel).setY(0); if (v.lengthSq() > 1) { v.normalize(); tgt.x += -v.z * 5; tgt.z += v.x * 5; } } // coupe la route sur le flanc
+      tv.copy(wrap(s.pos, tgt)); sp = SENT.hunt; look = yawOf(toP); aimTilt(s, toP, dt);
     }
-    tv.subVectors(target, s.pos); const L = tv.length();
-    if (L > 1e-3) { tv.divideScalar(L); s.dir.lerp(tv, 1 - Math.exp(-(s.state === 'chase' ? 5 : 1.6) * dt)).normalize(); }
-    s.speed += (sp - s.speed) * Math.min(1, dt * 2.5); s.pos.addScaledVector(s.dir, Math.min(s.speed * dt, Math.max(0, L - (s.state === 'chase' ? SENT.keep : 0))));
+    if (look != null) s.yaw = turn(s.yaw, look, 1 - Math.exp(-(s.state === 'hunt' ? 6 : 2.5) * dt));
+    const L = tv.length(); if (L > 1e-3) { tv.divideScalar(L); s.dir.lerp(tv, 1 - Math.exp(-(s.state === 'hunt' ? 5 : 2) * dt)).normalize(); }
+    s.speed += (sp - s.speed) * Math.min(1, dt * 2.5); s.pos.addScaledVector(s.dir, Math.min(s.speed * dt, L)); s.pos.y = Math.max(2, Math.min(40, s.pos.y));
+    for (const o of ctx.occ.pillars) { const d = wrap(tw.set(o[0], s.pos.y, o[1]), s.pos); d.y = 0; const r = o[2] + 1.6, l = d.length(); if (l < r && s.pos.y < o[3] + 1) s.pos.addScaledVector(d, (r - l) / Math.max(l, 1e-3)); } // contourne les piliers
   }
 }
+function aimTilt(s, rel, dt) { const h = Math.hypot(rel.x, rel.z), want = Math.max(-0.7, Math.min(0.9, Math.atan2(-rel.y, Math.max(h, 0.1)))); s.tilt += (want - s.tilt) * Math.min(1, dt * 3); }
+function startHunt(s, ctx, role) {
+  go(s, 'hunt'); s.role = role; s.aware = 1; s.lost = 0; s.lunge = 1; s.catchT = 0;
+  if (role === 'lead' && s.cool === 0) { s.alerts++; s.cool = SENT.cool; ctx.alarm(s); }
+  if (role === 'lead') for (const o of ctx.list || []) if (o !== s && o.active && !o.hidden && o.state !== 'hunt' && o.state !== 'stun') { o.last.copy(s.last); o.lastV.copy(s.lastV); startHunt(o, ctx, 'cut'); }
+}
+// Patrouille : file vers un verrou encore utile au joueur, en préférant ceux près de lui ; jamais le même que l'autre sentinelle.
+function pickWp(s, list, ctx) {
+  const G = ctx.G, T = ctx.targets(); if (!T.length) return;
+  let best = null, bs = Infinity; for (const t of T) { const id = `${t.x},${t.z}`; if (id === s.wpId || list.some(o => o !== s && o.wpId === id)) continue; const sc = ctx.wrap(G.pos, t).length() + ctx.rnd() * 14; if (sc < bs) { bs = sc; best = t; } }
+  best = best || T[0]; s.wpId = `${best.x},${best.z}`; const a = ctx.rnd() * Math.PI * 2; s.wp.set(best.x + Math.cos(a) * 9, Math.max(3, best.y + 3), best.z + Math.sin(a) * 9);
+}
+export function stunSentry(s) { s.state = 'stun'; s.stateT = 0; s.stun = SENT.stunT; s.aware = 0; s.catchT = 0; s.detect = 0; }

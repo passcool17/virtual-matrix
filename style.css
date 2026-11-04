@@ -160,7 +160,27 @@ h2 { font-size: clamp(20px, 5vw, 30px); margin: 0 0 8px; color: var(--primary); 
 }
 
 /* Alerte de détection sentinelle */
-.hud-sent { position: absolute; left: 50%; top: calc(50% - 74px); transform: translateX(-50%); padding: 4px 10px 6px; border: 1px solid var(--red, #ff3b30); background: rgba(30,4,4,.7); color: #ff6b60; font-size: 12px; letter-spacing: .12em; opacity: 0; pointer-events: none; text-shadow: 0 0 8px rgba(255,59,48,.7); }
+.hud-sent { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); padding: 4px 10px 6px; border: 1px solid var(--red, #ff3b30); background: rgba(30,4,4,.7); color: #ff6b60; font-size: 12px; letter-spacing: .12em; opacity: 0; pointer-events: none; text-shadow: 0 0 8px rgba(255,59,48,.7); }
 .hud-sent.on { opacity: 1; animation: sentBlink .5s steps(2) infinite; }
 .hud-sent i { display: block; height: 3px; margin-top: 4px; background: linear-gradient(90deg, #ff3b30 calc(var(--d, 0) * 100%), rgba(255,59,48,.18) 0); }
 @keyframes sentBlink { 50% { border-color: rgba(255,59,48,.35); } }
+.hud-sent[data-s="patrol"] { color: #8fbf9c; border-color: rgba(93,255,138,.35); background: rgba(4,12,8,.6); text-shadow: none; animation: none; opacity: .75; }
+.hud-sent[data-s="patrol"] i { display: none; }
+.hud-sent[data-s="suspicious"] { color: #ffb347; border-color: #ffb347; animation: none; }
+.hud-sent[data-s="suspicious"] i { background: linear-gradient(90deg, #ffb347 calc(var(--d, 0) * 100%), rgba(255,179,71,.18) 0); }
+.hud-sent[data-s="search"] { color: #ffd27a; border-color: rgba(255,210,122,.6); animation: none; }
+.hud-sent[data-s="search"] i { background: linear-gradient(90deg, #ffd27a calc(var(--d, 0) * 100%), rgba(255,210,122,.15) 0); }
+.hud-sent[data-s="stun"] { color: #7cc4ff; border-color: #7cc4ff; animation: none; }
+.hud-sent[data-s="stun"] i { background: linear-gradient(90deg, #7cc4ff calc(var(--d, 0) * 100%), rgba(124,196,255,.15) 0); }
+.hud-sent[data-s="hunt"] { font-weight: bold; }
+.touch .hud-sent { top: 168px; font-size: 11px; }
+
+/* signature énergétique : jauge + aura qui pulse plus vite avec la vitesse */
+.hud-sig { position: absolute; left: 16px; bottom: 16px; display: none; font: 600 10px/1 var(--mono, monospace); letter-spacing: .14em; color: #6dff9a; opacity: .75; pointer-events: none; }
+.hud-sig.on { display: block; }
+.hud-sig i { display: block; width: 120px; height: 4px; margin-top: 5px; background: linear-gradient(90deg, currentColor calc(var(--d, 0) * 100%), rgba(109,255,154,.15) 0); }
+.hud-sig[data-s=mid] { color: #ffb43b; } .hud-sig[data-s=hi] { color: #ff5a4a; opacity: 1; }
+.touch .hud-sig { left: auto; right: 14px; bottom: auto; top: 128px; font-size: 9px; } .touch .hud-sig i { width: 96px; }
+#sigAura { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 55%, transparent 58%, rgba(109,255,154,.22) 78%, rgba(109,255,154,.4) 100%); animation: sigp var(--p, 1.6s) ease-in-out infinite; }
+@keyframes sigp { 0%,100% { transform: scale(1); filter: hue-rotate(0deg); } 50% { transform: scale(1.04); filter: hue-rotate(-60deg); } }
+.hud-sent { white-space: nowrap; }

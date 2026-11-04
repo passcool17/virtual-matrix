@@ -10,35 +10,35 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'ok  ' : 'FAIL') + ' ' + 
   await p.goto('http://localhost:8642/?qa=1&seed=3'); await p.waitForFunction(() => window.__vm && __vm.G.phase === 'playing', null, { timeout: 120000 });
   ok(await ev(() => __vm.sentries().length === 2 && __vm.sentries()[0].active && !__vm.sentries()[1].active), 'une sentinelle active, la 2e en attente');
   // période de grâce : pas de détection
-  await ev(() => __vm.tpSentry(0, 9)); await ev(() => __vm.waitT(1));
+  await ev(() => __vm.tpSentry(0, 6)); await ev(() => __vm.waitT(1));
   ok(await ev(() => __vm.sentries()[0].detect === 0), 'grâce de début de run : aucune détection');
   await ev(() => __vm.tpClue ? 0 : 0); await ev(() => { __vm.G.pos.set(0, 40, 30); }); await ev(() => __vm.waitT(10));
   // détection progressive puis alerte
-  await ev(() => __vm.tpSentry(0, 9)); await ev(() => __vm.waitT(0.7)); await ev(() => __vm.tpSentry(0, 9));
+  await ev(() => __vm.tpSentry(0, 6)); await ev(() => __vm.waitT(0.3)); await ev(() => __vm.tpSentry(0, 6));
   const mid = await ev(() => ({ d: __vm.sentries()[0].detect, a: __vm.G.alert, hud: document.getElementById('hSent').classList.contains('on') }));
   ok(mid.d > 0.2 && mid.d < 1 && mid.a === 0 && mid.hud, `détection en cours (${mid.d.toFixed(2)}) + HUD « SENTINELLE · détection », pare-feu inchangé`);
-  for (let i = 0; i < 6; i++) { await ev(() => __vm.tpSentry(0, 9)); await ev(() => __vm.waitT(0.25)); }
+  for (let i = 0; i < 6; i++) { await ev(() => __vm.tpSentry(0, 6)); await ev(() => __vm.waitT(0.25)); }
   const hit = await ev(() => ({ a: __vm.G.alert, st: __vm.sentries()[0].state, c: __vm.sentries()[0].cool, n: __vm.sentries()[0].alerts }));
   ok(hit.a > 0.8 && hit.a < 1.2 && hit.n === 1, `après ~1,5 s dans le cône : pare-feu +1 (alerte ${hit.a.toFixed(2)})`);
-  ok(hit.st === 'chase' && hit.c > 8, `poursuite brève + recharge (${hit.st}, ${hit.c.toFixed(1)} s)`);
+  ok(hit.st === 'hunt' && hit.c > 6, `traque + recharge (${hit.st}, ${hit.c.toFixed(1)} s)`);
   // recharge : rester dans le cône ne redéclenche pas
-  for (let i = 0; i < 12; i++) { await ev(() => __vm.tpSentry(0, 9)); await ev(() => __vm.waitT(0.25)); }
+  for (let i = 0; i < 12; i++) { await ev(() => __vm.tpSentry(0, 6)); await ev(() => __vm.waitT(0.25)); }
   ok(await ev(() => __vm.sentries()[0].alerts === 1), 'recharge : pas de 2e alerte pendant 10 s');
   // perte de piste à distance
   await ev(() => __vm.G.pos.set(0, 40, 30)); await ev(() => __vm.waitT(6));
   ok(await ev(() => __vm.sentries()[0].state !== 'chase'), 'piste perdue → retour en patrouille');
   // verrou ouvert : tout est figé
   await ev(() => __vm.waitT(5)); // fin de recharge
-  await ev(() => __vm.tpSentry(0, 9)); await ev(() => __vm.open('spoon'));
+  await ev(() => __vm.tpSentry(0, 6)); await ev(() => __vm.open('spoon'));
   const f0 = await ev(() => ({ x: __vm.sentries()[0].pos.x, z: __vm.sentries()[0].pos.z, d: __vm.sentries()[0].detect, a: __vm.G.alert }));
   await ev(() => __vm.waitT(3));
   const f1 = await ev(() => ({ x: __vm.sentries()[0].pos.x, z: __vm.sentries()[0].pos.z, d: __vm.sentries()[0].detect, a: __vm.G.alert, hud: document.getElementById('hSent').classList.contains('on') }));
   ok(f0.x === f1.x && f0.z === f1.z && f1.d === f0.d && f1.a <= f0.a && !f1.hud, 'verrou ouvert : sentinelle et détection en pause');
   await ev(() => __vm.close()); await ev(() => __vm.waitT(0.3));
   // zone sûre autour d'un nœud
-  await ev(() => { const s = __vm.sentries()[0]; s.detect = 0; s.cool = 0; s.pos.set(-16, 9, -15); s.dir.set(0, 0, 1); s.state = 'patrol'; __vm.G.pos.set(-16, 6.5, -10); });
-  for (let i = 0; i < 8; i++) { await ev(() => { const s = __vm.sentries()[0]; s.pos.set(-16, 9, -15); s.dir.set(0, 0, 1); __vm.G.pos.set(-16, 6.5, -10); }); await ev(() => __vm.waitT(0.25)); }
-  ok(await ev(() => __vm.sentries()[0].detect === 0 && __vm.inCone(0)), 'près d\'un nœud (zone sûre) : jamais détecté même dans le cône');
+  await ev(() => { const s = __vm.sentries()[0]; s.detect = 0; s.aware = 0; s.cool = 0; s.pos.set(-16, 9, -15); s.yaw = 0; s.tilt = 0.3; s.state = 'patrol'; __vm.G.pos.set(-16, 6.5, -10); });
+  for (let i = 0; i < 8; i++) { await ev(() => { const s = __vm.sentries()[0]; s.pos.set(-16, 9, -15); s.yaw = 0; __vm.G.pos.set(-16, 6.5, -10); }); await ev(() => __vm.waitT(0.25)); }
+  ok(await ev(() => { const s = __vm.sentries()[0]; const d = s.detect; s.pos.set(-16, 9, -15); s.yaw = 0; s.tilt = 0.3; __vm.G.pos.set(-16, 6.5, -10); return d === 0 && __vm.inCone(0); }), 'près d\'un nœud (zone sûre) : jamais détecté même dans le cône');
   // renfort au niveau 2
   await ev(() => __vm.setAlert(4.6)); await ev(() => __vm.waitT(0.3));
   ok(await ev(() => __vm.sentries()[1].active), 'pare-feu ≥ 2 : 2e sentinelle en patrouille');

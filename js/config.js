@@ -14,6 +14,8 @@ export const CLUES = [
   { id: 'spoon', near: 'rabbit', off: [3.5, 2.5, -3] },
   { id: 'sleep', near: 'desert', off: [-4, 2, -3] },
 ];
+// Obstacles qui bloquent la vue des sentinelles : piliers de données [x, z, rayon, hauteur] et le noyau [x, y, z, rayon].
+export const OCC = { pillars: [[-4, -16, 1.8, 26], [9, 5, 1.8, 26], [-12, 8, 1.8, 26], [22, -6, 1.8, 26], [-28, 2, 1.8, 26], [8, 22, 1.8, 26]], spheres: [[0, 10, 0, 2.6]] };
 export const ALERT = { perDeny: 1, perGrant: 2, decay: 1 / 15, max: 8, sentinelSpeed: 9, hit: 2, push: 12 };
 export const alertLevel = a => (a >= 6 ? 3 : a >= 4 ? 2 : a >= 2 ? 1 : 0);
 export const BEST_KEY = 'vm-lockdown-best';

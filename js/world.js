@@ -1,6 +1,6 @@
 // Monde 3D : grille, pluie, noyau, nœuds verrouillés, indices flottants, sentinelle.
 import * as THREE from '../vendor/three.module.min.js';
-import { COL, NODES, CLUES } from './config.js';
+import { COL, NODES, CLUES, OCC, CFG } from './config.js';
 import { createSentinelModel } from './sentinel.js';
 
 const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -64,10 +64,15 @@ export function createWorld(canvas) {
   for (const c of CLUES) { const base = NODES.find(n => n.id === c.near); const pos = new THREE.Vector3(base.x + c.off[0], base.y + c.off[1], base.z + c.off[2]); clues[c.id] = { pos, sprite: null }; }
   function setClue(id, lines) { const c = clues[id]; if (c.sprite) scene.remove(c.sprite); c.sprite = textSprite(lines); c.sprite.position.copy(c.pos); scene.add(c.sprite); }
 
+  // Piliers de données (cachettes) : 1 maillage instancié + 1 jeu d'arêtes.
+  { const pg = new THREE.CylinderGeometry(1, 1, 1, 6), pm = new THREE.InstancedMesh(pg, new THREE.MeshBasicMaterial({ color: 0x06150c }), OCC.pillars.length), eg = new THREE.EdgesGeometry(pg), ep = [];
+    OCC.pillars.forEach(([x, z, r, h], i) => { const m = new THREE.Matrix4().compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(r, h, r)); pm.setMatrixAt(i, m); const a = eg.attributes.position.array, v = new THREE.Vector3(); for (let k = 0; k < a.length; k += 3) { v.set(a[k], a[k + 1], a[k + 2]).applyMatrix4(m); ep.push(v.x, v.y, v.z); } });
+    const lg2 = new THREE.BufferGeometry(); lg2.setAttribute('position', new THREE.Float32BufferAttribute(ep, 3)); scene.add(pm, new THREE.LineSegments(lg2, new THREE.LineBasicMaterial({ color: COL.node, transparent: true, opacity: 0.55 }))); }
   // Sentinelles (modèle procédural, js/sentinel.js) : 0 = patrouille / chasseuse du niveau 3, 1 = renfort pare-feu ≥ 2.
   const sents = [createSentinelModel(glow), createSentinelModel(glow)]; sents.forEach(m => { m.group.visible = false; scene.add(m.group); });
   const hoverPos = new THREE.Vector3(14, 27, -12), look = new THREE.Vector3();
-  function placeSent(m, pos, dir, t, dt, o) { m.group.visible = true; m.group.position.copy(pos); m.group.rotation.set(0, Math.atan2(dir.x, dir.z), 0); m.update(t, dt, o); }
+  function placeSent(m, pos, yaw, t, dt, o) { m.group.visible = true; m.group.position.copy(pos); // monde torique : on la dessine du côté de la caméra
+    for (const k of ['x', 'z']) { const d = pos[k] - camera.position[k]; if (d > CFG.wrap) m.group.position[k] -= 2 * CFG.wrap; else if (d < -CFG.wrap) m.group.position[k] += 2 * CFG.wrap; } m.group.rotation.set(0, yaw, 0); m.update(t, dt, o); }
 
   let frames = 0, fpsT = performance.now(), fps = 0;
   function resize() { const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
@@ -96,14 +101,14 @@ export function createWorld(canvas) {
     for (const id in clues) { const c = clues[id]; if (c.sprite) { c.sprite.material.opacity = (G.clues.has(id) ? 0.55 : 0.75) + Math.sin(t * 3) * 0.2; c.sprite.position.y = c.pos.y + Math.sin(t * 1.3) * 0.25; } }
     const SS = G.sentries || [];
     sents.forEach((m, i) => { const S = SS[i]; m.group.visible = false; if (!S || (G.lockId && (G.lockId !== 'source' || i))) return; // verrou ouvert : rien à rendre (sauf la menace SOURCE)
-      if (i === 0 && G.lockId === 'source') { look.subVectors(G.pos, hoverPos); placeSent(m, hoverPos, look, t, dt, { speed: 0, detect: 0.35 + 0.25 * Math.sin(t * 2), cone: false }); return; } // menace visuelle pendant la SOURCE
-      if (i === 0 && G.sentinel.on) { look.subVectors(G.pos, G.sentinel.pos); placeSent(m, G.sentinel.pos, look, t, dt, { speed: 9, detect: 1, lunge: 0.6, cone: false }); return; }
-      if (S.active && !S.hidden) placeSent(m, S.pos, S.dir, t, dt, { speed: S.speed, detect: S.cool > 0 ? 0 : S.detect, lunge: S.lunge, cone: S.cool === 0 }); });
+      if (i === 0 && G.lockId === 'source') { look.subVectors(G.pos, hoverPos); placeSent(m, hoverPos, Math.atan2(look.x, look.z), t, dt, { speed: 0, detect: 0.35 + 0.25 * Math.sin(t * 2), cone: false }); return; } // menace visuelle pendant la SOURCE
+      if (i === 0 && G.sentinel.on) { look.subVectors(G.pos, G.sentinel.pos); placeSent(m, G.sentinel.pos, Math.atan2(look.x, look.z), t, dt, { speed: 9, detect: 1, lunge: 0.6, cone: false }); return; }
+      if (S.active && !S.hidden) placeSent(m, S.pos, S.yaw, t, dt, { speed: S.speed, detect: S.detect, lunge: S.lunge, tilt: S.tilt, tune: S.tuneT > 0, cone: S.state !== 'stun' }); });
     renderer.render(scene, camera);
     frames++; const now = performance.now(); if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now;
       // Résolution adaptative : sous 28 img/s, on réduit la définition (jusqu'à 45 %).
       const next = fps < 28 ? Math.max(0.45, resScale * 0.8) : fps > 55 ? Math.min(1, resScale * 1.1) : resScale;
       if (Math.abs(next - resScale) > 0.01) { resScale = next; renderer.setPixelRatio(baseDpr * resScale); resize(); } }
   }
-  return { render, resize, renderer, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; }, get resScale() { return resScale; } };
+  return { render, resize, renderer, sents, setNode: (id, open) => { nodes[id].open = open; }, setClue, clues, get fps() { return fps; }, get resScale() { return resScale; } };
 }

@@ -1,6 +1,6 @@
 // Boucle, phases, verrous, pare-feu, sentinelle, score, HUD.
 import { Vector3 } from '../vendor/three.module.min.js';
-import { CFG, NODES, CLUES, ALERT, alertLevel, BEST_KEY } from './config.js';
+import { CFG, NODES, CLUES, ALERT, OCC, alertLevel, BEST_KEY } from './config.js';
 import { initAudio, setMuted, sfx } from './audio.js';
 import { initMusic, setMood, setMusicMuted, musicState, musicSeekEnd, duckMusic } from './music.js';
 import { initVoice, playVoice, stopVoice, setVoiceMuted, voiceState } from './voice.js';
@@ -8,7 +8,7 @@ import { startRain } from './rain2d.js';
 import { bindInput, bindTouch, readInput, onKey, isTouch, requestLock, releaseLock, pointerLocked } from './input.js';
 import { createWorld } from './world.js';
 import { LOCKS, PULSE } from './locks.js';
-import { SENT, makeSentries, resetSentries, stepSentries, inCone } from './sentinel.js';
+import { SENT, makeSentries, resetSentries, stepSentries, inCone, coneApex, coneAxis, losClear, stunSentry } from './sentinel.js';
 
 const $ = id => document.getElementById(id), app = $('app'), canvas = $('gl');
 const qs = new URLSearchParams(location.search);
@@ -36,7 +36,7 @@ const bestText = b => (b ? `${fmt(b.t)} · ${b.denied}✕` : '—');
 
 function newRun() {
   G.rnd = mulberry(seed++); G.t = 0; G.runT = 0; G.pos.set(...CFG.start); G.vel.set(0, 0, 0); G.yaw = 0; G.pitch = 0; G.trauma = 0;
-  G.opened = new Set(); G.order = []; G.frags = {}; G.clues = new Set(); G.alert = 0; G.alertLvl = 0; G.redMix = 0; G.denied = 0; G.sentinel.on = false; resetSentries(G.sentries); G.endAt = 0;
+  G.opened = new Set(); G.order = []; G.frags = {}; G.clues = new Set(); G.alert = 0; G.alertLvl = 0; G.redMix = 0; G.denied = 0; G.sentinel.on = false; resetSentries(G.sentries); G.sentAlarms = 0; G.sentCatches = 0; G.pulseCd = 0; G.prevPos = null; G.noise = 0; G.sig = 0; G.prevSp = 0; G.endAt = 0;
   locks = {}; for (const n of NODES) { world.setNode(n.id, false); if (n.id !== 'source') locks[n.id] = LOCKS[n.id](lockCtx(n.id)); }
   CLUES.forEach(c => world.setClue(c.id, locks[c.id].clueLines()));
   clearDenied(); closeLock(true); hud(true);
@@ -115,10 +115,17 @@ function step(dt) {
   } else G.vel.set(0, 0, 0);
   for (const k of ['x', 'z']) { if (G.pos[k] > CFG.wrap) G.pos[k] -= 2 * CFG.wrap; if (G.pos[k] < -CFG.wrap) G.pos[k] += 2 * CFG.wrap; }
   G.pos.y = Math.max(CFG.yMin, Math.min(CFG.yMax, G.pos.y));
+  for (const o of OCC.pillars) { const d = wrapDelta(tmp.set(o[0], G.pos.y, o[1]).clone(), G.pos); d.y = 0; const r = o[2] + 0.5, l = d.length(); if (l < r && G.pos.y < o[3] + 0.5) G.pos.addScaledVector(d, (r - l) / Math.max(l, 1e-3)); } // on ne traverse pas les piliers
+  // signature énergétique (antigravité) : plus on file vite / accélère, plus on émet ; flotter lentement = quasi invisible
+  { const sp = G.prevPos && dt > 0 ? wrapDelta(G.prevPos, G.pos).length() / dt : 0, acc = dt > 0 ? Math.abs(sp - G.prevSp) / dt : 0; G.prevSp = sp;
+    const want = lock ? 0 : Math.min(1, Math.max(0, (sp - 2) / (CFG.flySpeed * 2.05 - 2)) + Math.min(0.25, acc * 0.004));
+    G.sig += (want - G.sig) * (1 - Math.exp(-dt * (want > G.sig ? 6 : 2.5)));
+    G.noise = G.sig > SENT.sigOn ? SENT.sigMin + (SENT.sigMax - SENT.sigMin) * G.sig : 0; (G.prevPos ||= new Vector3()).copy(G.pos); }
   // nœud proche
   let best = null, bd = Infinity; for (const n of NODES) { const d = wrapDelta(G.pos, tmp.set(n.x, n.y, n.z).clone()).length(); if (d < bd) { bd = d; best = n; } }
   G.nearDist = bd; G.nearest = best; G.near = bd <= CFG.hackRange ? best.id : null;
-  if (I.hack && G.near && !lock) openLock(G.near);
+  if (I.hack && G.near && !lock) openLock(G.near); else if (I.hack && !lock) pulse();
+  G.pulseCd = Math.max(0, G.pulseCd - dt);
   // indices
   for (const c of CLUES) if (!G.clues.has(c.id) && G.pos.distanceTo(world.clues[c.id].pos) < CFG.clueRange) { G.clues.add(c.id); sfx.tick(); toast(`◇ INDICE CAPTÉ · ${nodeById[c.id].title} · ${locks[c.id].clueText()}`); if (G.lockId === c.id) $('lkClue').textContent = `◇ Indice capté : ${lock.clueText()}`; hud(true); }
   // pare-feu
@@ -136,8 +143,9 @@ function step(dt) {
     for (const k of ['x', 'z']) { if (S.pos[k] > CFG.wrap) S.pos[k] -= 2 * CFG.wrap; if (S.pos[k] < -CFG.wrap) S.pos[k] += 2 * CFG.wrap; }
   }
   // sentinelles de patrouille : figées tant qu'un verrou est ouvert ; la 1re devient la chasseuse du niveau 3
-  const S0 = G.sentries[0]; if (S.on && !S0.hidden) S0.hidden = true; else if (!S.on && S0.hidden) { S0.hidden = false; S0.pos.copy(S.pos); S0.state = 'return'; S0.cool = SENT.cool; }
-  stepSentries(G.sentries, dt, { G, frozen: !!lock, safe: p => NODES.some(n => wrapDelta(p, tmp.set(n.x, n.y, n.z).clone()).length() < SENT.safe), wrap: (a, b) => wrapDelta(a, b).clone(), beep: k => sfx.scan(k), alarm: sentryAlarm });
+  const S0 = G.sentries[0]; if (S.on && !S0.hidden) S0.hidden = true; else if (!S.on && S0.hidden) { S0.hidden = false; S0.pos.copy(S.pos); S0.state = 'search'; S0.stateT = 0; S0.last.copy(S.pos); S0.cool = SENT.cool; }
+  stepSentries(G.sentries, dt, { G, frozen: !!lock, safe: p => NODES.some(n => !G.opened.has(n.id) && wrapDelta(p, tmp.set(n.x, n.y, n.z).clone()).length() < SENT.safe), wrap: (a, b) => wrapDelta(a, b).clone(), occ: OCC, sigR: G.noise, rnd: Math.random,
+    targets: () => NODES.filter(n => !G.opened.has(n.id) && (n.id !== 'source' || G.opened.size >= 5)).map(n => new Vector3(n.x, n.y, n.z)), beep: k => sfx.scan(k), alarm: sentryAlarm, caught: sentryCatch });
   for (const s of G.sentries) for (const k of ['x', 'z']) { if (s.pos[k] > CFG.wrap) s.pos[k] -= 2 * CFG.wrap; if (s.pos[k] < -CFG.wrap) s.pos[k] += 2 * CFG.wrap; }
   G.trauma = Math.max(0, G.trauma - 1.8 * dt);
   lock?.update(G.t);
@@ -147,7 +155,20 @@ function step(dt) {
   if (G.endAt && G.t >= G.endAt) { G.endAt = 0; complete(); }
 }
 
-function sentryAlarm() { G.alert = Math.min(ALERT.max, G.alert + 1); G.alertLvl = alertLevel(G.alert); G.sentAlarms = (G.sentAlarms || 0) + 1; G.trauma = Math.min(1, G.trauma + 0.5); sfx.deny(); toast('⚠ SENTINELLE · repéré — pare-feu +1'); hud(true); }
+function sentryAlarm() { G.alert = Math.min(ALERT.max, G.alert + 1); G.alertLvl = alertLevel(G.alert); G.sentAlarms = (G.sentAlarms || 0) + 1; G.trauma = Math.min(1, G.trauma + 0.5); sfx.deny(); toast('⚠ SENTINELLE · TRAQUE — pare-feu +1 · casse sa ligne de vue'); hud(true); }
+// Capturé : éjecté à 14 m, pare-feu +1, +8 s au chrono.
+function sentryCatch(s) {
+  const d = wrapDelta(s.pos, G.pos).clone(); if (d.lengthSq() < 1e-4) d.set(0, 0, 1); d.normalize(); G.pos.addScaledVector(d, 14); G.pos.y = Math.max(CFG.yMin, Math.min(CFG.yMax, G.pos.y + 3)); G.vel.set(0, 0, 0);
+  G.alert = Math.min(ALERT.max, G.alert + 1); G.alertLvl = alertLevel(G.alert); G.runT += 8; G.sentCatches++; G.trauma = 1; sfx.deny(); sfx.jack(); toast('⚠ CAPTURÉ · éjecté — pare-feu +1 · +8 s'); hud(true);
+}
+// Impulsion (E / DÉCODER loin d'un verrou) : brouille 3 s les sentinelles à moins de 11 m en vue. Recharge 15 s.
+function pulse() {
+  if (G.pulseCd > 0) { toast(`IMPULSION · recharge ${Math.ceil(G.pulseCd)} s`); return 0; }
+  const hit = G.sentries.filter(s => s.active && !s.hidden && s.state !== 'stun' && wrapDelta(G.pos, s.pos).length() < 11 && losClear(G.pos, wrapDelta(G.pos, s.pos).clone(), OCC, (a, b) => wrapDelta(a, b).clone()));
+  if (!hit.length) { toast('IMPULSION · aucune sentinelle à portée (11 m)'); return 0; }
+  hit.forEach(stunSentry); G.pulseCd = 15; sfx.decode(); G.trauma = Math.min(1, G.trauma + 0.3); toast(`IMPULSION · sentinelle brouillée ${SENT.stunT} s`); hud(true); return hit.length;
+}
+const SLBL = { patrol: 'Patrouille', suspicious: 'Soupçon', hunt: 'TRAQUE', search: 'Recherche', stun: 'Brouillée' }, SPRI = { hunt: 4, suspicious: 3, search: 2, stun: 1, patrol: 0 };
 let hudT = 0;
 function hud(force) {
   if (!force && G.t - hudT < 0.1) return; hudT = G.t;
@@ -161,7 +182,11 @@ function hud(force) {
   else if (n) { const srcLocked = n.id === 'source' && G.opened.size < 5 && !G.opened.has('source');
     P.innerHTML = G.opened.has(n.id) ? `${n.title} · ouvert` : srcLocked ? `${n.title} · ${5 - G.opened.size} verrou(s) requis` : `VERROU ${n.title}<small>${touchMode ? 'Appuie DÉCODER' : 'Appuie E — crocheter'} · ${G.nearDist.toFixed(1)} m</small>`; }
   else { const t = NODES.map(x => ({ x, d: wrapDelta(G.pos, new Vector3(x.x, x.y, x.z)).length() })).filter(o => !G.opened.has(o.x.id)).sort((a, b) => a.d - b.d)[0]; P.innerHTML = t ? `<small>SIGNAL ${t.x.title} · ${t.d.toFixed(0)} m</small>` : ''; }
-  { const d = Math.max(0, ...G.sentries.map(s => (s.active && !s.hidden && !lock ? s.detect : 0))), el = $('hSent'); el.classList.toggle('on', d > 0.04); el.style.setProperty('--d', d.toFixed(2)); }
+  { const el = $('hSent'), vis = lock ? [] : G.sentries.filter(s => s.active && !s.hidden), top = vis.sort((a, b) => SPRI[b.state] - SPRI[a.state] || b.aware - a.aware)[0];
+    el.classList.toggle('on', !!top); if (top) { const d = top.state === 'hunt' ? (top.catchT > 0 ? top.catchT / SENT.catchT : 1) : top.state === 'suspicious' ? top.aware : top.state === 'search' ? 1 - top.stateT / SENT.searchT : top.state === 'stun' ? top.stun / SENT.stunT : 0;
+      const txt = `SENTINELLE · ${top.state === 'hunt' && top.catchT > 0 ? 'CONTACT' : top.state === 'suspicious' && top.tuneT > 0 && !top.seen ? 'Fréquence captée' : SLBL[top.state]}${G.pulseCd ? '' : ' · ⌁'}`; if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.firstChild.textContent = txt; } el.dataset.s = top.state; el.style.setProperty('--d', Math.max(0, d).toFixed(2)); } }
+  { const a = $('sigAura'), k = lock ? 0 : G.sig; a.style.opacity = (k * 0.5).toFixed(3); a.style.setProperty('--p', (1.6 - k * 1.2).toFixed(2) + 's');
+    const h = $('hSig'); h.classList.toggle('on', !lock && G.phase === 'playing'); h.style.setProperty('--d', k.toFixed(2)); h.dataset.s = G.noise ? (k > 0.6 ? 'hi' : 'mid') : 'lo'; }
   $('tHack').classList.toggle('ready', !!G.near && !G.opened.has(G.near));
   app.classList.toggle('locked', pointerLocked());
   if (!touchMode) radar();
@@ -182,7 +207,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
   if (G.phase === 'playing') { step(dt); hud(); }
-  if (G.phase !== 'paused') setMood(G.phase !== 'playing' ? 'menu' : G.lockId === 'source' ? 'source' : G.alertLvl >= 2 ? 'alert' : 'calm');
+  if (G.phase !== 'paused') setMood(G.phase !== 'playing' ? 'menu' : G.lockId === 'source' ? 'source' : G.alertLvl >= 2 || G.sentries.some(s => s.state === 'hunt' && s.active && !s.hidden) ? 'alert' : 'calm');
   if (G.phase === 'playing' || G.phase === 'paused') { $('flash').style.opacity = (G.trauma * G.trauma * 0.42).toFixed(3); world.render(G, G.phase === 'playing' ? dt : 0); }
   requestAnimationFrame(frame);
 }
@@ -205,7 +230,9 @@ window.__vm = { G, world, music: musicState, voice: voiceState, musicSeekEnd, ge
   tp: id => { const n = nodeById[id]; G.pos.set(n.x, n.y, n.z + 2.5); G.yaw = 0; G.pitch = 0; G.vel.set(0, 0, 0); },
   tpClue: id => { G.pos.copy(world.clues[id].pos).add(new Vector3(0, 0, 3)); G.yaw = 0; G.pitch = 0; },
   sentries: () => G.sentries, inCone: i => inCone(G.sentries[i], G.pos), renderInfo: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles }),
-  tpSentry: (i, dist = 9) => { const s = G.sentries[i]; G.pos.copy(s.pos).add(s.dir.clone().setY(0).normalize().multiplyScalar(dist * Math.cos(SENT.tilt))).add(new Vector3(0, -dist * Math.sin(SENT.tilt), 0)); G.yaw = Math.atan2(s.dir.x, s.dir.z); G.pitch = 0; G.vel.set(0, 0, 0); },
+  tpSentry: (i, dist = 9) => { const s = G.sentries[i]; G.pos.copy(coneApex(s)).addScaledVector(coneAxis(s), dist); G.yaw = s.yaw; G.pitch = 0; G.vel.set(0, 0, 0); G.prevPos = null; },
+  coneMesh: i => { const c = world.sents[i].cone; c.updateWorldMatrix(true, false); const e = c.matrixWorld.elements, l = Math.hypot(e[8], e[9], e[10]); return { apex: [e[12], e[13], e[14]], axis: [e[8] / l, e[9] / l, e[10] / l], visible: c.visible && world.sents[i].group.visible }; }, // cône VISIBLE (monde)
+  pulse: () => pulse(), stun: i => stunSentry(G.sentries[i]), apex: i => coneApex(G.sentries[i]).clone(), axis: i => coneAxis(G.sentries[i]).clone(), los: (a, b) => losClear(a, wrapDelta(a, b).clone(), OCC, (x, y) => wrapDelta(x, y).clone()),
   setAlert: v => { G.alert = v; G.alertLvl = alertLevel(v); }, secret: id => locks[id]?.secret(), fps: () => world.fps, waitT: s => new Promise(r => { const end = G.t + s; const f = () => (G.t >= end ? r(G.t) : requestAnimationFrame(f)); f(); }) };
 initMusic();
 initVoice(on => { duckMusic(on); $('lkVoice').classList.toggle('on', on); });
